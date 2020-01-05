@@ -52,7 +52,7 @@ func TestPostgres_AddSource(t *testing.T) {
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		db, err := newTestDb(info)
-		require.NoError(t, err)
+		assert.NoError(err)
 
 		for _, s := range sources {
 			s, err := db.AddSource(s)
@@ -71,7 +71,7 @@ func TestPostgres_GetSources(t *testing.T) {
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		db, err := newTestDb(info)
-		require.NoError(t, err)
+		assert.NoError(err)
 
 		for i, s := range sources {
 			// Creating these differences to test list with scheduled option
@@ -108,7 +108,7 @@ func TestPostgres_RemoveSource(t *testing.T) {
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		db, err := newTestDb(info)
-		require.NoError(t, err)
+		assert.NoError(err)
 
 		tests := []testRow{
 			{0, true},
@@ -146,7 +146,7 @@ func TestPostgres_UpdateSource(t *testing.T) {
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		db, err := newTestDb(info)
-		require.NoError(t, err)
+		assert.NoError(err)
 
 		for i, s := range sources {
 			s, err := db.AddSource(s)

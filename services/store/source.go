@@ -162,20 +162,13 @@ func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
 		options = &GetSourceOption{}
 	}
 
-	switch {
-	case options.ScheduledToRun:
-		err := p.db.
-			Where("state = ? AND next_time <= ?", ScheduleNoop, time.Now().UTC()).
-			Find(&sources).
-			Error
-		if err != nil {
-			return nil, errors.Wrap(err, "error getting sources that are scheduled to run")
-		}
-	default:
-		err := p.db.Find(&sources).Error
-		if err != nil {
-			return nil, errors.Wrap(err, "error getting sources")
-		}
+	query := p.db
+	if options.ScheduledToRun {
+		query = query.Where("state = ? AND next_time <= ?", ScheduleNoop, time.Now().UTC())
+	}
+
+	if err := query.Find(&sources).Error; err != nil {
+		return nil, errors.Wrap(err, "error getting sources")
 	}
 
 	return sources, nil
