@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"nidavellir/services/docker"
+	"nidavellir/services/image"
 	"nidavellir/services/repo"
 )
 
@@ -15,6 +16,10 @@ func systemCheck() {
 	}
 
 	if err := repo.SystemCheck(); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	if err := image.SystemCheck(); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 

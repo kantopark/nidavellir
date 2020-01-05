@@ -58,5 +58,7 @@ func New(path string) (*Runtime, error) {
 		return nil, errors.Wrap(err, "could not decode yaml file")
 	}
 
+	runtime.Runtime = strings.TrimSpace(strings.ToLower(runtime.Runtime))
+
 	return &runtime, nil
 }
