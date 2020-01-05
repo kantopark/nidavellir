@@ -54,7 +54,7 @@ func dbReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	return db.PingContext(ctx) == nil
 }
 
-func newTestDb(c dktest.ContainerInfo) (*Postgres, error) {
+func newTestDb(c dktest.ContainerInfo, seedFns ...func(p *Postgres) error) (*Postgres, error) {
 	ip, strPort, err := c.FirstPort()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not obtain test postgres db network address")
@@ -74,6 +74,12 @@ func newTestDb(c dktest.ContainerInfo) (*Postgres, error) {
 
 	if err = store.Migrate(); err != nil {
 		return nil, err
+	}
+
+	for _, f := range seedFns {
+		if err := f(store); err != nil {
+			return nil, err
+		}
 	}
 
 	return store, nil
