@@ -40,6 +40,7 @@ func New(option *DbOption) (*Postgres, error) {
 	for i := 1; i < 10; i++ {
 		db, err := gorm.Open("postgres", option.ConnectionString(false))
 		if err == nil {
+			db.SingularTable(true)
 			return &Postgres{db: db}, nil
 		}
 		wait += i
