@@ -8,6 +8,8 @@ import (
 )
 
 func TestPostgres_Migrate(t *testing.T) {
+	t.Parallel()
+
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		db, err := newTestDb(info)
 		require.NoError(t, err)
