@@ -26,6 +26,7 @@ type ContainerRunOptions struct {
 	Cmd     []string
 	Ports   map[int]int
 	Volumes map[string]string
+	Daemon  bool
 }
 
 func (o *ContainerRunOptions) imageTag() (string, error) {
@@ -43,6 +44,10 @@ func (o *ContainerRunOptions) imageTag() (string, error) {
 
 func (c *Container) Run(options *ContainerRunOptions) (logs string, err error) {
 	args := []string{"container", "run"}
+
+	if options.Daemon {
+		args = append(args, "-d")
+	}
 
 	for key, value := range options.Env {
 		args = append(args, "-e", fmt.Sprintf("%s=%s", key, value))
