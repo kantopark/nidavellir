@@ -1,6 +1,17 @@
 package docker
 
-import "strings"
+import (
+	"errors"
+	"os/exec"
+	"strings"
+)
+
+func SystemCheck() error {
+	if _, err := exec.LookPath("docker"); err != nil {
+		return errors.New("docker is required")
+	}
+	return nil
+}
 
 func splitOutput(output []byte) []string {
 	var results []string
