@@ -21,9 +21,9 @@ type Source struct {
 	Name      string    `json:"name"`
 	RepoUrl   string    `json:"repo_url"`
 	CommitTag string    `json:"commit_tag"`
-	NextTime  time.Time `json:"next_time"`
 	Interval  int       `json:"interval"`
 	State     string    `json:"state"`
+	NextTime  time.Time `json:"next_time"`
 }
 
 func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval int) (*Source, error) {
@@ -31,9 +31,9 @@ func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval in
 		Name:      name,
 		RepoUrl:   repoUrl,
 		CommitTag: commitTag,
-		NextTime:  startTime,
 		Interval:  interval,
 		State:     ScheduleNoop,
+		NextTime:  startTime,
 	}
 
 	if err := s.Validate(); err != nil {
@@ -69,39 +69,23 @@ func (s *Source) Validate() error {
 	return nil
 }
 
-func (s *Source) NextRuntime() time.Time {
-	lastRuntime := s.NextTime
-	for lastRuntime.Before(time.Now().UTC()) {
-		lastRuntime = lastRuntime.Add(time.Duration(s.Interval) * time.Second)
-	}
-	return lastRuntime
-}
-
-func (s *Source) ToRunState() error {
-	if s.State != ScheduleQueued {
-		return errors.Errorf("cannot reach '%s' state from '%s'", ScheduleRunning, s.State)
-	}
-	s.State = ScheduleRunning
-
-	return nil
-}
-
-func (s *Source) ToQueueState() error {
-	if s.State != ScheduleNoop {
-		return errors.Errorf("cannot reach '%s' state from '%s'", ScheduleQueued, s.State)
-	}
+// sets the source state to Queued
+func (s *Source) Queued() *Source {
 	s.State = ScheduleQueued
-
-	return nil
+	return s
 }
 
-func (s *Source) ToNoopState() error {
-	if s.State != ScheduleQueued {
-		return errors.Errorf("cannot reach '%s' state from '%s'", ScheduleRunning, s.State)
-	}
+// sets the source state to Running
+func (s *Source) Running() *Source {
 	s.State = ScheduleRunning
+	return s
+}
 
-	return nil
+// Sets the job's state to completed and calculates the next runtime
+func (s *Source) Completed() *Source {
+	s.NextTime = s.NextTime.Add(time.Duration(s.Interval) * time.Second)
+	s.State = ScheduleNoop
+	return s
 }
 
 func (p *Postgres) AddSource(source *Source) (*Source, error) {
