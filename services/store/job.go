@@ -59,6 +59,7 @@ func (j *Job) ToSuccessState() error {
 	return nil
 }
 
+// Adds a new job
 func (p *Postgres) AddJob(sourceId int, trigger string) (*Job, error) {
 	if trigger != TriggerSchedule && trigger != TriggerManual {
 		return nil, errors.Errorf("'%s' is not a valid trigger", trigger)
@@ -80,6 +81,7 @@ func (p *Postgres) AddJob(sourceId int, trigger string) (*Job, error) {
 	return job, nil
 }
 
+// Updates the details of the job. Must have the id specified
 func (p *Postgres) UpdateJob(job *Job) (*Job, error) {
 	if job.Id <= 0 {
 		return nil, errors.New("job id must be specified")
@@ -103,6 +105,8 @@ type ListJobOption struct {
 	SourceId int
 }
 
+// Gets a list of all jobs specified by the options. If options are not specified
+// returns all jobs
 func (p *Postgres) GetJobs(options *ListJobOption) ([]*Job, error) {
 	var jobs []*Job
 

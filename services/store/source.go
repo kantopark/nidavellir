@@ -1,7 +1,10 @@
 package store
 
 import (
+	"fmt"
+	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -17,23 +20,27 @@ const (
 )
 
 type Source struct {
-	Id        int       `json:"id"`
-	Name      string    `json:"name"`
-	RepoUrl   string    `json:"repo_url"`
-	CommitTag string    `json:"commit_tag"`
-	Interval  int       `json:"interval"`
-	State     string    `json:"state"`
-	NextTime  time.Time `json:"next_time"`
+	Id         int       `json:"id"`
+	Name       string    `json:"name"`
+	UniqueName string    `json:"-"`
+	RepoUrl    string    `json:"repo_url"`
+	CommitTag  string    `json:"commit_tag"`
+	Interval   int       `json:"interval"`
+	State      string    `json:"state"`
+	NextTime   time.Time `json:"next_time"`
 }
 
 func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval int) (*Source, error) {
+	name = strings.TrimSpace(name)
+
 	s := &Source{
-		Name:      name,
-		RepoUrl:   repoUrl,
-		CommitTag: commitTag,
-		Interval:  interval,
-		State:     ScheduleNoop,
-		NextTime:  startTime,
+		Name:       name,
+		UniqueName: strings.ToLower(strings.Replace(name, " ", "-", -1)),
+		RepoUrl:    repoUrl,
+		CommitTag:  commitTag,
+		Interval:   interval,
+		State:      ScheduleNoop,
+		NextTime:   startTime,
 	}
 
 	if err := s.Validate(); err != nil {
@@ -69,6 +76,25 @@ func (s *Source) Validate() error {
 	return nil
 }
 
+func (s *Source) WorkDir() (string, error) {
+	var dir string
+	switch runtime.GOOS {
+	case "windows":
+		dir = "C:/temp/nidavellir/jobs"
+	case "darwin", "linux":
+		dir = "/var/nidavellir/jobs"
+	default:
+		return "", errors.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
+
+	dir = fmt.Sprintf("%s/%s", dir, s.UniqueName)
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return "", errors.New("could not create working directory for source")
+	}
+
+	return dir, nil
+}
+
 // sets the source state to Queued
 func (s *Source) Queued() *Source {
 	s.State = ScheduleQueued
@@ -88,6 +114,7 @@ func (s *Source) Completed() *Source {
 	return s
 }
 
+// Adds a new job source
 func (p *Postgres) AddSource(source *Source) (*Source, error) {
 	source.Id = 0 // force primary key to be empty
 	if err := source.Validate(); err != nil {
@@ -101,6 +128,7 @@ func (p *Postgres) AddSource(source *Source) (*Source, error) {
 	return source, nil
 }
 
+// Updates a job source
 func (p *Postgres) UpdateSource(source *Source) (*Source, error) {
 	if err := source.Validate(); err != nil {
 		return nil, err
@@ -120,6 +148,7 @@ func (p *Postgres) UpdateSource(source *Source) (*Source, error) {
 	return source, nil
 }
 
+// Removes a job source
 func (p *Postgres) RemoveSource(id int) error {
 	if id <= 0 {
 		return errors.New("source id must be specified")
@@ -140,6 +169,8 @@ type GetSourceOption struct {
 	ScheduledToRun bool
 }
 
+// Gets a list of jobs sources specified by the option. If nil, lists all job
+// sources
 func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
 	var sources []*Source
 	if options == nil {
