@@ -76,13 +76,13 @@ func TestPostgres_UpdateJob(t *testing.T) {
 		err = job.ToStartState()
 		assert.NoError(err)
 
-		job, err = db.UpdateJob(job)
+		job, err = db.UpdateJob(*job)
 		assert.NoError(err)
 		assert.EqualValues(job.State, JobRunning)
 
 		err = job.ToSuccessState()
 		assert.NoError(err)
-		job, err = db.UpdateJob(job)
+		job, err = db.UpdateJob(*job)
 		assert.NoError(err)
 		assert.EqualValues(job.State, JobSuccess)
 
@@ -90,13 +90,13 @@ func TestPostgres_UpdateJob(t *testing.T) {
 		err = job.ToStartState()
 		assert.NoError(err)
 
-		job, err = db.UpdateJob(job)
+		job, err = db.UpdateJob(*job)
 		assert.NoError(err)
 		assert.EqualValues(job.State, JobRunning)
 
 		err = job.ToFailureState()
 		assert.NoError(err)
-		job, err = db.UpdateJob(job)
+		job, err = db.UpdateJob(*job)
 		assert.NoError(err)
 		assert.EqualValues(job.State, JobFailure)
 	})

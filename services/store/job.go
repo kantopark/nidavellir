@@ -82,21 +82,21 @@ func (p *Postgres) AddJob(sourceId int, trigger string) (*Job, error) {
 }
 
 // Updates the details of the job. Must have the id specified
-func (p *Postgres) UpdateJob(job *Job) (*Job, error) {
+func (p *Postgres) UpdateJob(job Job) (*Job, error) {
 	if job.Id <= 0 {
 		return nil, errors.New("job id must be specified")
 	}
 
 	err := p.db.
-		Model(job).
+		Model(&job).
 		Where("id = ?", job.Id).
-		Update(*job).
+		Update(job).
 		Error
 	if err != nil {
 		return nil, errors.Wrap(err, "could not update job")
 	}
 
-	return job, nil
+	return &job, nil
 }
 
 type ListJobOption struct {
