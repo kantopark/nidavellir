@@ -151,7 +151,7 @@ func TestPostgres_UpdateSource(t *testing.T) {
 		for i, s := range sources {
 			s, err := db.AddSource(s)
 			assert.NoError(err)
-			sources[i] = s
+			sources[i] = *s
 		}
 
 		prefix := "New-Project"
@@ -169,8 +169,8 @@ func TestPostgres_UpdateSource(t *testing.T) {
 	})
 }
 
-func newSources() ([]*Source, error) {
-	var sources []*Source
+func newSources() ([]Source, error) {
+	var sources []Source
 	for _, i := range []struct {
 		Name      string
 		RepoUrl   string
@@ -184,7 +184,7 @@ func newSources() ([]*Source, error) {
 		if err != nil {
 			return nil, err
 		}
-		sources = append(sources, s)
+		sources = append(sources, *s)
 	}
 	return sources, nil
 }

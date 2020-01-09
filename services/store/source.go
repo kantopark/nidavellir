@@ -1,10 +1,7 @@
 package store
 
 import (
-	"fmt"
-	"os"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
@@ -28,6 +25,7 @@ type Source struct {
 	Interval   int       `json:"interval"`
 	State      string    `json:"state"`
 	NextTime   time.Time `json:"next_time"`
+	Secrets    []Secret  `json:"secrets"`
 }
 
 func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval int) (*Source, error) {
@@ -37,7 +35,7 @@ func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval in
 		Name:       name,
 		UniqueName: strings.ToLower(strings.Replace(name, " ", "-", -1)),
 		RepoUrl:    repoUrl,
-		CommitTag:  commitTag,
+		CommitTag:  strings.TrimSpace(commitTag),
 		Interval:   interval,
 		State:      ScheduleNoop,
 		NextTime:   startTime,
@@ -76,31 +74,6 @@ func (s *Source) Validate() error {
 	return nil
 }
 
-func (s *Source) WorkDir() (string, error) {
-	var dir string
-	switch runtime.GOOS {
-	case "windows":
-		dir = "C:/temp/nidavellir/jobs"
-	case "darwin", "linux":
-		dir = "/var/nidavellir/jobs"
-	default:
-		return "", errors.Errorf("unsupported platform: %s", runtime.GOOS)
-	}
-
-	dir = fmt.Sprintf("%s/%s", dir, s.UniqueName)
-	if err := os.MkdirAll(dir, 0777); err != nil {
-		return "", errors.New("could not create working directory for source")
-	}
-
-	return dir, nil
-}
-
-// sets the source state to Queued
-func (s *Source) Queued() *Source {
-	s.State = ScheduleQueued
-	return s
-}
-
 // sets the source state to Running
 func (s *Source) Running() *Source {
 	s.State = ScheduleRunning
@@ -115,21 +88,21 @@ func (s *Source) Completed() *Source {
 }
 
 // Adds a new job source
-func (p *Postgres) AddSource(source *Source) (*Source, error) {
+func (p *Postgres) AddSource(source Source) (*Source, error) {
 	source.Id = 0 // force primary key to be empty
 	if err := source.Validate(); err != nil {
 		return nil, err
 	}
 
-	if err := p.db.Create(source).Error; err != nil {
+	if err := p.db.Create(&source).Error; err != nil {
 		return nil, errors.Wrap(err, "could not create new source")
 	}
 
-	return source, nil
+	return &source, nil
 }
 
 // Updates a job source
-func (p *Postgres) UpdateSource(source *Source) (*Source, error) {
+func (p *Postgres) UpdateSource(source Source) (*Source, error) {
 	if err := source.Validate(); err != nil {
 		return nil, err
 	} else if source.Id <= 0 {
@@ -137,15 +110,15 @@ func (p *Postgres) UpdateSource(source *Source) (*Source, error) {
 	}
 
 	err := p.db.
-		Model(source).
+		Model(&source).
 		Where("id = ?", source.Id).
-		Update(*source).
+		Update(source).
 		Error
 	if err != nil {
 		return nil, errors.Wrap(err, "could not update source")
 	}
 
-	return source, nil
+	return &source, nil
 }
 
 // Removes a job source
