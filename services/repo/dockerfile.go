@@ -1,10 +1,9 @@
-package image
+package repo
 
 import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -57,7 +56,7 @@ func (d *dockerfile) fetchFile() error {
 
 func (d *dockerfile) writeRequirements() error {
 	req := "requirements.txt"
-	if _, err := os.Stat(filepath.Join(d.WorkDir, req)); os.IsNotExist(err) {
+	if !libs.PathExists(filepath.Join(d.WorkDir, req)) {
 		return nil
 	}
 
