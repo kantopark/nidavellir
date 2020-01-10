@@ -69,6 +69,9 @@ func (c *Container) Run(options *ContainerRunOptions) (logs string, err error) {
 		args = append(args, "--restart", "unless-stopped")
 	} else {
 		args = append(args, "--restart", restart)
+		if restart == "no" {
+			args = append(args, "--rm")
+		}
 	}
 
 	if image, err := options.imageTag(); err != nil {
