@@ -25,7 +25,7 @@ type Source struct {
 	Interval   int       `json:"interval"`
 	State      string    `json:"state"`
 	NextTime   time.Time `json:"next_time"`
-	Secrets    []Secret  `json:"secrets"`
+	Secrets    []Secret  `json:"secrets" gorm:"PRELOAD:true"`
 }
 
 func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval int) (*Source, error) {
@@ -33,7 +33,7 @@ func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval in
 
 	s := &Source{
 		Name:       name,
-		UniqueName: strings.ToLower(strings.Replace(name, " ", "-", -1)),
+		UniqueName: libs.LowerTrimReplaceSpace(name),
 		RepoUrl:    repoUrl,
 		CommitTag:  strings.TrimSpace(commitTag),
 		Interval:   interval,
@@ -160,4 +160,19 @@ func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
 	}
 
 	return sources, nil
+}
+
+// Masks all secret values
+func (s *Source) maskSecrets() {
+	if len(s.Secrets) == 0 {
+		return
+	}
+
+	var secrets []Secret
+	for _, secret := range s.Secrets {
+		secret.Value = strings.Repeat("*", len(secret.Value))
+		secrets = append(secrets, secret)
+	}
+
+	s.Secrets = secrets
 }

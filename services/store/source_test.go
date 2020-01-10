@@ -94,6 +94,27 @@ func TestPostgres_GetSources(t *testing.T) {
 	})
 }
 
+func TestPostgres_GetSources_MaskedSecret(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		db, err := newTestDb(info, seedSources, seedSecrets)
+		assert.NoError(err)
+
+		sources, err := db.GetSources(nil)
+		assert.NoError(err)
+		assert.Len(sources, 2)
+
+		for _, source := range sources {
+			for _, secret := range source.Secrets {
+				assert.EqualValues(strings.Repeat("*", len(secret.Value)), secret.Value)
+			}
+		}
+	})
+}
+
 func TestPostgres_RemoveSource(t *testing.T) {
 	t.Parallel()
 
