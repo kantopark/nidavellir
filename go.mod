@@ -9,6 +9,8 @@ require (
 	github.com/jinzhu/gorm v1.9.11
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.1
+	github.com/spf13/viper v1.6.1
 	github.com/stretchr/testify v1.3.0
-	gopkg.in/yaml.v2 v2.2.2
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	gopkg.in/yaml.v2 v2.2.4
 )

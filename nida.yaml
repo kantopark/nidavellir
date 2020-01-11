@@ -1,0 +1,7 @@
+image:
+  build-args:
+    key: useful to put in http_proxy and https_proxy here
+
+admin:
+  username: admin
+  password: password  # change this with the environment variable nida_admin.username
