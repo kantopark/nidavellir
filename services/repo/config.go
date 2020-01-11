@@ -91,6 +91,8 @@ func (r *Runtime) CommitTag(workDir string) (string, error) {
 
 	// verify that commitTag given is valid
 	cmd := exec.Command("git", "rev-parse", "--verify", tag)
+	cmd.Dir = workDir
+
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return "", errors.Wrap(err, "could not verify if hash or commit is valid")
 	} else if strings.HasPrefix(strings.TrimSpace(string(output)), "fatal") {
