@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"nidavellir/config"
 	"nidavellir/libs"
 )
 
@@ -26,8 +27,7 @@ type Repo struct {
 }
 
 func NewRepo(source, name string) (*Repo, error) {
-
-	workDir, err := repoDir(source)
+	conf, err := config.New()
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func NewRepo(source, name string) (*Repo, error) {
 		Name:    libs.LowerTrimReplaceSpace(name),
 		Gitlab:  os.Getenv("NIDA_GITLAB") == "1",
 		Token:   os.Getenv("NIDA_TOKEN"),
-		WorkDir: workDir,
+		WorkDir: conf.WorkDir.RepoPath(name),
 	}, nil
 }
 

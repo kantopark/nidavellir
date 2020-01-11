@@ -10,8 +10,9 @@ import (
 )
 
 type Config struct {
-	Admin adminConfig `mapstructure:"admin"`
-	Image imageConfig `mapstructure:"image"`
+	Admin   adminConfig   `mapstructure:"admin"`
+	Image   imageConfig   `mapstructure:"image"`
+	WorkDir workDirConfig `mapstructure:"work-dir"`
 }
 
 func New() (*Config, error) {
@@ -34,6 +35,10 @@ func New() (*Config, error) {
 	}
 
 	if err := config.Admin.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := config.WorkDir.Validate(); err != nil {
 		return nil, err
 	}
 

@@ -5,3 +5,6 @@ image:
 admin:
   username: admin
   password: password  # change this with the environment variable nida_admin.username
+
+work-dir:
+  path:  # leave this empty to use the default working directory
