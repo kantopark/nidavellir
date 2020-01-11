@@ -108,20 +108,9 @@ func checkout(commit string) (string, error) {
 	return logs, nil
 }
 
+// Checks if the image exists
 func (b *Builder) ImageExists() (bool, error) {
-	args := []string{"image", "list", "--format", "{{.Repository}}"}
-	cmd := exec.Command("docker", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return false, errors.Wrap(err, "could not get list of docker images")
-	}
-
-	for _, name := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		if strings.TrimSpace(name) == b.Image {
-			return true, nil
-		}
-	}
-	return false, nil
+	return ImageExists(b.Image)
 }
 
 // Based on the runtime setup type, generates a Dockerfile. If there are any changes to the
@@ -165,4 +154,21 @@ func (b *Builder) prepareDockerfile() (string, error) {
 	}
 
 	return "", nil
+}
+
+// Checks if the given image name exists
+func ImageExists(imageName string) (bool, error) {
+	args := []string{"image", "list", "--format", "{{.Repository}}"}
+	cmd := exec.Command("docker", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, errors.Wrap(err, "could not get list of docker images")
+	}
+
+	for _, name := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		if strings.TrimSpace(name) == imageName {
+			return true, nil
+		}
+	}
+	return false, nil
 }
