@@ -62,6 +62,25 @@ func TestPostgres_AddSource(t *testing.T) {
 	})
 }
 
+func TestPostgres_GetSource(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		db, err := newTestDb(info, seedSources)
+		assert.NoError(err)
+
+		source, err := db.GetSource(1)
+		assert.NoError(err)
+		assert.IsType(&Source{}, source)
+
+		source, err = db.GetSource(0)
+		assert.Error(err)
+		assert.Nil(source)
+	})
+}
+
 func TestPostgres_GetSources(t *testing.T) {
 	t.Parallel()
 

@@ -35,6 +35,25 @@ func TestPostgres_GetJob(t *testing.T) {
 		db, err := newTestDb(info, seedSources, seedJobs)
 		assert.NoError(err)
 
+		job, err := db.GetJob(1)
+		assert.NoError(err)
+		assert.IsType(&Job{}, job)
+
+		job, err = db.GetJob(0)
+		assert.Error(err)
+		assert.Nil(job)
+	})
+}
+
+func TestPostgres_GetJobs(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		db, err := newTestDb(info, seedSources, seedJobs)
+		assert.NoError(err)
+
 		jobs, err := db.GetJobs(nil)
 		assert.NoError(err)
 		assert.Len(jobs, 2)
