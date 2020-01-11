@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 
 	"nidavellir/config"
 	"nidavellir/libs"
@@ -26,6 +25,9 @@ type Repo struct {
 	WorkDir string
 }
 
+// Creates a new repository given the source (remote gitlab or github url) and
+// name (the unique identifier for the repo which will be used as the image name
+// and file path)
 func NewRepo(source, name string) (*Repo, error) {
 	conf, err := config.New()
 	if err != nil {
@@ -41,6 +43,8 @@ func NewRepo(source, name string) (*Repo, error) {
 	}, nil
 }
 
+// Clones the repo if it does not exists. If repo exists, checks if it is outdated. If repo is outdated,
+// remove original repo and clone it again (thus force updating it)
 func (r *Repo) Clone() error {
 	if r.Exists() {
 		if update, err := r.needsToUpdate(); err != nil {
@@ -68,11 +72,13 @@ func (r *Repo) Clone() error {
 	return nil
 }
 
-// Checks if the repository exists
+// Checks if the repository exists in the filepath. If it doesn't, it should lead to
+// a repo.Clone
 func (r *Repo) Exists() bool {
 	return libs.PathExists(r.WorkDir)
 }
 
+// Gets the runtime config for the repository
 func (r *Repo) Runtime() (*Runtime, error) {
 	if !r.Exists() {
 		return nil, errors.New("directory does not exist. could not get runtime configuration")
@@ -81,28 +87,30 @@ func (r *Repo) Runtime() (*Runtime, error) {
 	return RuntimeFromDir(r.WorkDir)
 }
 
-func (r *Repo) BuildImage() error {
+// Builds the image for the repository given the setup instructions from
+// the runtime config
+func (r *Repo) BuildImage() (string, error) {
 	conf, err := r.Runtime()
 	if err != nil {
-		return err
+		return "", err
 	}
+
 	b, err := NewImageBuilder(r.Name, r.WorkDir, conf)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if exists, err := b.ImageExists(); err != nil {
-		return err
+		return "", err
 	} else if exists {
-		return nil
+		return "", err
 	}
 
 	logs, err := b.Build()
 	if err != nil {
-		return err
+		return "", err
 	}
-	log.Print(logs)
-	return nil
+	return logs, nil
 }
 
 func (r *Repo) gitUrl() string {
