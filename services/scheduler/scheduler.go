@@ -17,6 +17,8 @@ type Scheduler struct {
 	manager    IManager
 }
 
+// Scheduler pings the database at fixed interval to look for new jobs
+// If there are, it will push the job into the manager
 func NewScheduler(db IStore, manager IManager) *Scheduler {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	s := &Scheduler{

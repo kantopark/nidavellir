@@ -22,6 +22,8 @@ type JobManager struct {
 	queue *JobQueue
 }
 
+// The manager holds a queue of job. Whenever there are new jobs, it will dispatch
+// the job. At any one time, it can only run one job. Thus the jobs are queued.
 func NewJobManager(ctx context.Context) (*JobManager, error) {
 	conf, err := config.New()
 	if err != nil {
@@ -39,6 +41,8 @@ func NewJobManager(ctx context.Context) (*JobManager, error) {
 	return m, nil
 }
 
+// Adds a job into the manager queue. Jobs are saved as TaskGroups in the
+// manager queue
 func (m *JobManager) AddJob(source *store.Source, trigger string) error {
 	job, err := m.db.AddJob(source.Id, trigger)
 	if err != nil {
