@@ -4,39 +4,35 @@ import (
 	"context"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"nidavellir/services/store"
 )
 
 type Scheduler struct {
-	db         Db
-	queue      chan *store.Job
-	ctx        context.Context
 	cancelFunc func()
+	ctx        context.Context
 	err        chan error
+	store      IStore
+	manager    IManager
 }
 
-type Db interface {
-	GetJobs(options *store.ListJobOption) ([]*store.Job, error)
-}
-
-func New(db Db) *Scheduler {
+func NewScheduler(db IStore, manager IManager) *Scheduler {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	s := &Scheduler{
-		db:         db,
-		queue:      make(chan *store.Job, 100),
-		ctx:        ctx,
 		cancelFunc: cancelFunc,
-		err:        make(chan error, 1),
+		ctx:        ctx,
+		err:        make(chan error),
+		manager:    manager,
+		store:      db,
 	}
 
-	go s.fetchJobs()
+	go s.fetchAndQueueJobs()
 
 	return s
 }
 
-// Returns the error channel. Use this as a channel to implement an error
-// stop in the main function
-func (s *Scheduler) Error() <-chan error {
+func (s *Scheduler) Errors() <-chan error {
 	return s.err
 }
 
@@ -45,22 +41,28 @@ func (s *Scheduler) Close() {
 }
 
 // fetches eligible jobs and puts them in the job queue
-func (s *Scheduler) fetchJobs() {
+func (s *Scheduler) fetchAndQueueJobs() {
 	ticker := time.NewTicker(10 * time.Second)
+
 	for {
 		select {
 		case <-ticker.C:
-			jobs, err := s.db.GetJobs(&store.ListJobOption{
-				Trigger: store.TriggerSchedule,
-				State:   store.ScheduleNoop,
+			todos, err := s.store.GetSources(&store.GetSourceOption{
+				ScheduledToRun: true,
+				MaskSecrets:    false,
 			})
 			if err != nil {
-				s.err <- err
-				return
+				s.err <- errors.Wrap(err, "could not fetch sources in scheduler")
+				continue
 			}
-			for _, j := range jobs {
-				s.queue <- j
+
+			for _, t := range todos {
+				if err := s.manager.AddJob(t, store.TriggerSchedule); err != nil {
+					s.err <- errors.Wrap(err, "could not add new job")
+					continue
+				}
 			}
+
 		case <-s.ctx.Done():
 			return
 		}
