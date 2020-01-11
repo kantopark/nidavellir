@@ -103,13 +103,21 @@ func TestPostgres_GetSources_MaskedSecret(t *testing.T) {
 		db, err := newTestDb(info, seedSources, seedSecrets)
 		assert.NoError(err)
 
-		sources, err := db.GetSources(nil)
-		assert.NoError(err)
-		assert.Len(sources, 2)
+		for _, mask := range []bool{true, false} {
+			sources, err := db.GetSources(&GetSourceOption{MaskSecrets: mask})
+			assert.NoError(err)
+			assert.Len(sources, 2)
 
-		for _, source := range sources {
-			for _, secret := range source.Secrets {
-				assert.EqualValues(strings.Repeat("*", len(secret.Value)), secret.Value)
+			for _, source := range sources[1:] {
+				assert.NotZero(len(source.Secrets))
+
+				for _, secret := range source.Secrets {
+					if mask {
+						assert.EqualValues(strings.Repeat("*", len(secret.Value)), secret.Value)
+					} else {
+						assert.NotEqual(strings.Repeat("*", len(secret.Value)), secret.Value)
+					}
+				}
 			}
 		}
 	})

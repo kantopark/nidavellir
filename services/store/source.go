@@ -25,7 +25,7 @@ type Source struct {
 	Interval   int       `json:"interval"`
 	State      string    `json:"state"`
 	NextTime   time.Time `json:"next_time"`
-	Secrets    []Secret  `json:"secrets" gorm:"PRELOAD:true"`
+	Secrets    []Secret  `json:"secrets"`
 }
 
 func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval int) (*Source, error) {
@@ -140,6 +140,7 @@ func (p *Postgres) RemoveSource(id int) error {
 
 type GetSourceOption struct {
 	ScheduledToRun bool
+	MaskSecrets    bool
 }
 
 // Gets a list of jobs sources specified by the option. If nil, lists all job
@@ -157,6 +158,12 @@ func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
 
 	if err := query.Find(&sources).Error; err != nil {
 		return nil, errors.Wrap(err, "error getting sources")
+	}
+
+	if options.MaskSecrets {
+		for _, source := range sources {
+			source.maskSecrets()
+		}
 	}
 
 	return sources, nil
