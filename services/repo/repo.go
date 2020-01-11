@@ -81,7 +81,7 @@ func (r *Repo) Runtime() (*Runtime, error) {
 	return RuntimeFromDir(r.WorkDir)
 }
 
-func (r *Repo) BuildImage(buildArgs map[string]string) error {
+func (r *Repo) BuildImage() error {
 	conf, err := r.Runtime()
 	if err != nil {
 		return err
@@ -97,7 +97,7 @@ func (r *Repo) BuildImage(buildArgs map[string]string) error {
 		return nil
 	}
 
-	logs, err := b.Build(buildArgs)
+	logs, err := b.Build()
 	if err != nil {
 		return err
 	}

@@ -3,11 +3,11 @@ package repo
 import (
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
 
+	"nidavellir/config"
 	"nidavellir/libs"
 )
 
@@ -16,6 +16,7 @@ type Builder struct {
 	Image     string
 	CommitTag string
 	Runtime   *Runtime
+	BuildArgs map[string]string
 }
 
 func NewImageBuilder(name, workDir string, runtime *Runtime) (*Builder, error) {
@@ -35,14 +36,20 @@ func NewImageBuilder(name, workDir string, runtime *Runtime) (*Builder, error) {
 		return nil, err
 	}
 
+	conf, err := config.New()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Builder{
 		WorkDir:   workDir,
 		Image:     fmt.Sprintf("%s:%s", name, commitTag),
 		CommitTag: commitTag,
+		BuildArgs: conf.Image.BuildArgs,
 	}, nil
 }
 
-func (b *Builder) Build(buildArgs map[string]string) (logs string, err error) {
+func (b *Builder) Build() (logs string, err error) {
 	gitLog, err := checkout(b.CommitTag)
 	if err != nil {
 		return gitLog, err
@@ -57,7 +64,7 @@ func (b *Builder) Build(buildArgs map[string]string) (logs string, err error) {
 		return "image is updated and thus not built", nil
 	}
 
-	buildLog, err := b.buildImage(file, buildArgs)
+	buildLog, err := b.buildImage(file)
 	logs = gitLog + "\n\n\n" + buildLog
 	if err != nil {
 		return logs, err
@@ -66,10 +73,10 @@ func (b *Builder) Build(buildArgs map[string]string) (logs string, err error) {
 	return
 }
 
-func (b *Builder) buildImage(file string, buildArgs map[string]string) (string, error) {
+func (b *Builder) buildImage(file string) (string, error) {
 	args := []string{"image", "build", "-f", file, "--tag", b.Image}
 
-	for key, value := range buildArgs {
+	for key, value := range b.BuildArgs {
 		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", key, value))
 	}
 
@@ -117,37 +124,45 @@ func (b *Builder) ImageExists() (bool, error) {
 	return false, nil
 }
 
+// Based on the runtime setup type, generates a Dockerfile. If there are any changes to the
+// Dockerfile, a build.Dockerfile will be created in the working repository. The presence of
+// this file will cause the function to return "build.Dockerfile" which will then trigger an
+// image build. If no changes, an empty string is returned which will not trigger any builds
 func (b *Builder) prepareDockerfile() (string, error) {
-	switch t := b.Runtime.Setup.Type; t {
-	case "dockerfile":
-		fp := filepath.Join(b.WorkDir, "Dockerfile")
-		if !libs.PathExists(fp) {
-			return "", errors.New("dockerfile missing")
-		}
+	runtimeType := b.Runtime.Setup.Type
+	file, err := newDockerfile(runtimeType, b.WorkDir)
+	if err != nil {
+		return "", err
+	}
 
-		return filepath.Join(b.WorkDir, "Dockerfile"), nil
-	case "python", "r":
-		file, err := newDockerfile(t, b.WorkDir)
-		if err != nil {
+	switch runtimeType {
+	case "dockerfile":
+		if err := file.loadContent(); err != nil {
 			return "", err
 		}
+
+		file.writeBuildArgs(b.BuildArgs)
+
+	case "python", "r":
 		if err := file.fetchFile(); err != nil {
 			return "", err
 		}
 
+		file.writeBuildArgs(b.BuildArgs)
 		if err := file.writeRequirements(); err != nil {
 			return "", err
 		}
 
-		if file.HasChanges {
-			if err := file.createDockerfile(); err != nil {
-				return "", err
-			}
-			return file.FilePath, nil
-		}
-
-		return "", nil
 	default:
-		return "", errors.Errorf("unsupported runtime '%s'", t)
+		return "", errors.Errorf("unsupported runtime '%s'", runtimeType)
 	}
+
+	if file.HasChanges {
+		if err := file.createDockerfile(); err != nil {
+			return "", err
+		}
+		return file.FilePath, nil
+	}
+
+	return "", nil
 }
