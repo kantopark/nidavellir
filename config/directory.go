@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -39,5 +40,35 @@ func (w *workDirConfig) Validate() error {
 // Returns the path of the repository
 func (w *workDirConfig) RepoPath(name string) string {
 	name = libs.LowerTrimReplaceSpace(name)
-	return filepath.Join(w.Path, name)
+	return filepath.Join(w.Path, "repo", name)
+}
+
+func (w *workDirConfig) LogFilePath(name, runDate string) string {
+	dir := w.createFolder("logs", name)
+	return filepath.Join(dir, runDate+".log")
+}
+
+// Gets the image log file path. The path is uniquely defined by the image
+// name and the image tag
+func (w *workDirConfig) ImageBuildLogPath(name, tag string) string {
+	dir := w.createFolder("image-logs", name)
+
+	return filepath.Join(dir, tag+".log")
+}
+
+func (w *workDirConfig) OutputDir(jobId int) string {
+	return w.createFolder("output", strconv.Itoa(jobId))
+}
+
+func (w *workDirConfig) createFolder(group, name string) string {
+	name = libs.LowerTrimReplaceSpace(name)
+	dir := filepath.Join(w.Path, group, name)
+
+	if !libs.PathExists(dir) {
+		if err := os.MkdirAll(dir, 0777); err != nil {
+			panic(err)
+		}
+	}
+
+	return dir
 }
