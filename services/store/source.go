@@ -75,13 +75,13 @@ func (s *Source) Validate() error {
 }
 
 // sets the source state to Running
-func (s *Source) Running() *Source {
+func (s *Source) ToRunning() *Source {
 	s.State = ScheduleRunning
 	return s
 }
 
 // Sets the job's state to completed and calculates the next runtime
-func (s *Source) Completed() *Source {
+func (s *Source) ToCompleted() *Source {
 	s.NextTime = s.NextTime.Add(time.Duration(s.Interval) * time.Second)
 	s.State = ScheduleNoop
 	return s
@@ -96,6 +96,16 @@ func (p *Postgres) AddSource(source Source) (*Source, error) {
 
 	if err := p.db.Create(&source).Error; err != nil {
 		return nil, errors.Wrap(err, "could not create new source")
+	}
+
+	return &source, nil
+}
+
+// Gets the source with the specified id
+func (p *Postgres) GetSource(id int) (*Source, error) {
+	var source Source
+	if err := p.db.First(&source, "id = ?", id).Error; err != nil {
+		return nil, errors.Wrapf(err, "could not find source with id '%d'", id)
 	}
 
 	return &source, nil
@@ -182,4 +192,14 @@ func (s *Source) maskSecrets() {
 	}
 
 	s.Secrets = secrets
+}
+
+func (s *Source) SecretMap() map[string]string {
+	secrets := make(map[string]string, len(s.Secrets))
+
+	for _, secret := range s.Secrets {
+		secrets[secret.Key] = secret.Value
+	}
+
+	return secrets
 }

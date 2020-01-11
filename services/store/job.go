@@ -99,10 +99,13 @@ func (p *Postgres) UpdateJob(job Job) (*Job, error) {
 	return &job, nil
 }
 
-type ListJobOption struct {
-	Trigger  string
-	State    string
-	SourceId int
+// Gets a job by it's id
+func (p *Postgres) GetJob(id int) (*Job, error) {
+	var job Job
+	if err := p.db.First(&job, "id = ?", id).Error; err != nil {
+		return nil, errors.Wrapf(err, "could not get job with id '%d'", id)
+	}
+	return &job, nil
 }
 
 // Gets a list of all jobs specified by the options. If options are not specified
@@ -130,4 +133,10 @@ func (p *Postgres) GetJobs(options *ListJobOption) ([]*Job, error) {
 	}
 
 	return jobs, nil
+}
+
+type ListJobOption struct {
+	Trigger  string
+	State    string
+	SourceId int
 }
