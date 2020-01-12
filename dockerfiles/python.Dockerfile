@@ -10,6 +10,8 @@ RUN apt-get update && ACCEPT_EULA=Y apt-get install -y msodbcsql17
 
 RUN pip install numpy scipy pandas pyodbc scikit-learn copulae pyodbc psycopg2-binary requests xlrd
 
+WORKDIR /repo
+
 # TEMPLATE LINE OVERWRITE
 
 ENTRYPOINT ["python"]
