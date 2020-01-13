@@ -67,38 +67,40 @@ func NewRuntime(path string) (*Runtime, error) {
 		return nil, errors.Wrap(err, "could not decode yaml file")
 	}
 
-	config.Setup.format()
+	if err := config.Setup.format(filepath.Dir(path)); err != nil {
+		return nil, errors.Wrap(err, "could not format tag")
+	}
 
 	return &config, nil
 }
 
-func (s *Setup) format() {
+func (s *Setup) format(workDir string) error {
 	s.Type = libs.LowerTrim(s.Type)
-	s.Tag = libs.LowerTrim(s.Tag)
-}
-
-func (r *Runtime) CommitTag(workDir string) (string, error) {
-	r.Setup.format()
-	tag := r.Setup.Tag
+	tag := libs.LowerTrim(s.Tag)
 
 	if tag == "" || tag == "master" || tag == "latest" {
+		// gets latest tag since tag not specified
 		cmd := exec.Command("git", "rev-parse", "master")
+		cmd.Dir = workDir
+
 		if output, err := cmd.CombinedOutput(); err != nil {
-			return "", errors.Wrap(err, "could not get latest git commit hash")
+			return errors.Wrap(err, "could not get latest git commit hash")
 		} else {
-			return strings.TrimSpace(string(output)), nil
+			tag = strings.TrimSpace(string(output))
+		}
+	} else {
+		// check specified tag exists
+		cmd := exec.Command("git", "rev-parse", "--verify", tag)
+		cmd.Dir = workDir
+
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return errors.Wrap(err, "could not verify if hash or commit is valid")
+		} else if strings.HasPrefix(strings.TrimSpace(string(output)), "fatal") {
+			return errors.Errorf("%s is not a valid commit or tag", tag)
 		}
 	}
 
-	// verify that commitTag given is valid
-	cmd := exec.Command("git", "rev-parse", "--verify", tag)
-	cmd.Dir = workDir
+	s.Tag = tag
 
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return "", errors.Wrap(err, "could not verify if hash or commit is valid")
-	} else if strings.HasPrefix(strings.TrimSpace(string(output)), "fatal") {
-		return "", errors.Errorf("%s is not a valid commit or tag", tag)
-	}
-
-	return tag, nil
+	return nil
 }

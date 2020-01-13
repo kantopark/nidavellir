@@ -57,9 +57,7 @@ func NewRepo(source, name string) (*Repo, error) {
 		return nil, err
 	}
 
-	if err := r.getRepoTag(); err != nil {
-		return nil, err
-	}
+	r.CommitTag = r.Runtime.Setup.Tag
 
 	// Checkout repo
 	if err := r.Checkout(); err != nil {
@@ -209,19 +207,4 @@ func (r *Repo) getCommitHash(commit string) (string, error) {
 	}
 
 	return strings.TrimSpace(string(output)), nil
-}
-
-func (r *Repo) getRepoTag() error {
-	r.CommitTag = strings.TrimSpace(r.Runtime.Setup.Tag)
-
-	// if hash is not specified, get latest master hash
-	if r.CommitTag == "" {
-		hash, err := r.getCommitHash("master")
-		if err != nil {
-			return errors.Wrap(err, "could not get repo hash to checkout")
-		}
-		r.CommitTag = hash
-	}
-
-	return nil
 }
