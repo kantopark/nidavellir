@@ -19,8 +19,9 @@ type Runtime struct {
 }
 
 type Setup struct {
-	Type string `yaml:"type"`
-	Tag  string `yaml:"tag"`
+	Type         string `yaml:"type"`
+	Tag          string `yaml:"tag"`
+	Requirements bool   `yaml:"requirements"`
 }
 
 type Step struct {

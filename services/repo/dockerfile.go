@@ -12,7 +12,7 @@ import (
 	"nidavellir/libs"
 )
 
-type dockerfile struct {
+type Dockerfile struct {
 	Lang       string
 	WorkDir    string
 	Content    string
@@ -20,12 +20,12 @@ type dockerfile struct {
 	FilePath   string
 }
 
-func newDockerfile(lang, workDir string) (*dockerfile, error) {
+func NewDockerfile(lang, workDir string) (*Dockerfile, error) {
 	if !libs.IsIn(lang, []string{"dockerfile", "python"}) {
 		return nil, errors.Errorf("unsupported dockerfile language: %s", lang)
 	}
 
-	return &dockerfile{
+	return &Dockerfile{
 		Lang:     lang,
 		WorkDir:  workDir,
 		FilePath: "build.Dockerfile",
@@ -34,7 +34,7 @@ func newDockerfile(lang, workDir string) (*dockerfile, error) {
 
 // Fetches the template file from the github repo. This is used when the user uses the default
 // Dockerfile that is provided
-func (d *dockerfile) fetchFile() error {
+func (d *Dockerfile) fetchFile() error {
 	var url string
 	switch d.Lang {
 	case "python":
@@ -58,7 +58,7 @@ func (d *dockerfile) fetchFile() error {
 
 // Loads the template file from the user's working directory. This is used when the user specifies his
 // or her own Dockerfile
-func (d *dockerfile) loadContent() error {
+func (d *Dockerfile) loadContent() error {
 	fp := filepath.Join(d.WorkDir, "Dockerfile")
 	if !libs.PathExists(fp) {
 		return errors.New("dockerfile missing")
@@ -78,7 +78,7 @@ func (d *dockerfile) loadContent() error {
 // building which the user may not and should not be aware of. Examples include http_proxy and https_proxy
 // Instead of arguments, these values are actually injected as environment variables which will be removed
 // later
-func (d *dockerfile) writeBuildArgs(buildArgs map[string]string) {
+func (d *Dockerfile) writeBuildArgs(buildArgs map[string]string) {
 	if len(buildArgs) == 0 {
 		return
 	}
@@ -134,7 +134,7 @@ func (d *dockerfile) writeBuildArgs(buildArgs map[string]string) {
 }
 
 // Includes any additional requirements that the user has
-func (d *dockerfile) writeRequirements() error {
+func (d *Dockerfile) writeRequirements() error {
 	req := "requirements.txt"
 	if !libs.PathExists(filepath.Join(d.WorkDir, req)) {
 		return nil
@@ -154,7 +154,7 @@ RUN pip install -f %s
 
 // creates the new dockerfile in the repo's working directory which will then be used
 // by Docker to build the image
-func (d *dockerfile) createDockerfile() error {
+func (d *Dockerfile) createDockerfile() error {
 	err := ioutil.WriteFile(d.FilePath, []byte(d.Content), 0777)
 	if err != nil {
 		return errors.Wrapf(err, "could not create '%s'", d.FilePath)

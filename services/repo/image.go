@@ -12,28 +12,23 @@ import (
 )
 
 type Builder struct {
-	WorkDir   string
-	Image     string
-	CommitTag string
-	Runtime   *Runtime
-	BuildArgs map[string]string
+	WorkDir     string
+	Image       string
+	CommitTag   string
+	BuildArgs   map[string]string
+	RuntimeType string
 }
 
-func NewImageBuilder(name, workDir string, runtime *Runtime) (*Builder, error) {
+func NewImageBuilder(imageName, commitTag, workDir, runtimeType string) (*Builder, error) {
 	if !libs.PathExists(workDir) {
 		return nil, errors.New("directory does not exist")
 	}
 
-	name = strings.TrimSpace(name)
-	if name == "" {
+	imageName = strings.TrimSpace(imageName)
+	if imageName == "" {
 		return nil, errors.New("image name cannot be empty")
-	} else if strings.Contains(name, ":") {
+	} else if strings.Contains(imageName, ":") {
 		return nil, errors.New("image name should not contain ':'")
-	}
-
-	commitTag, err := runtime.CommitTag(workDir)
-	if err != nil {
-		return nil, err
 	}
 
 	conf, err := config.New()
@@ -42,19 +37,15 @@ func NewImageBuilder(name, workDir string, runtime *Runtime) (*Builder, error) {
 	}
 
 	return &Builder{
-		WorkDir:   workDir,
-		Image:     fmt.Sprintf("%s:%s", name, commitTag),
-		CommitTag: commitTag,
-		BuildArgs: conf.Image.BuildArgs,
+		WorkDir:     workDir,
+		Image:       fmt.Sprintf("%s:%s", imageName, commitTag),
+		CommitTag:   commitTag,
+		BuildArgs:   conf.Image.BuildArgs,
+		RuntimeType: runtimeType,
 	}, nil
 }
 
 func (b *Builder) Build() (logs string, err error) {
-	gitLog, err := checkout(b.CommitTag)
-	if err != nil {
-		return gitLog, err
-	}
-
 	file, err := b.prepareDockerfile()
 	if err != nil {
 		return "", err
@@ -64,8 +55,7 @@ func (b *Builder) Build() (logs string, err error) {
 		return "image is updated and thus not built", nil
 	}
 
-	buildLog, err := b.buildImage(file)
-	logs = gitLog + "\n\n\n" + buildLog
+	logs, err = b.buildImage(file)
 	if err != nil {
 		return logs, err
 	}
@@ -92,22 +82,6 @@ func (b *Builder) buildImage(file string) (string, error) {
 	return string(output), nil
 }
 
-func checkout(commit string) (string, error) {
-	cmd := exec.Command("git", "checkout", commit)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", errors.Wrapf(err, "could not checkout '%s'", commit)
-	}
-
-	logs := strings.TrimSpace(string(output))
-	if strings.HasPrefix(logs, "error") {
-		return "", errors.Wrapf(err, "could not checkout '%s'", commit)
-	}
-
-	return logs, nil
-}
-
 // Checks if the image exists
 func (b *Builder) ImageExists() (bool, error) {
 	return ImageExists(b.Image)
@@ -118,13 +92,12 @@ func (b *Builder) ImageExists() (bool, error) {
 // this file will cause the function to return "build.Dockerfile" which will then trigger an
 // image build. If no changes, an empty string is returned which will not trigger any builds
 func (b *Builder) prepareDockerfile() (string, error) {
-	runtimeType := b.Runtime.Setup.Type
-	file, err := newDockerfile(runtimeType, b.WorkDir)
+	file, err := NewDockerfile(b.RuntimeType, b.WorkDir)
 	if err != nil {
 		return "", err
 	}
 
-	switch runtimeType {
+	switch b.RuntimeType {
 	case "dockerfile":
 		if err := file.loadContent(); err != nil {
 			return "", err
@@ -143,7 +116,7 @@ func (b *Builder) prepareDockerfile() (string, error) {
 		}
 
 	default:
-		return "", errors.Errorf("unsupported runtime '%s'", runtimeType)
+		return "", errors.Errorf("unsupported runtime '%s'", b.RuntimeType)
 	}
 
 	if file.HasChanges {
