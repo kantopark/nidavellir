@@ -21,21 +21,19 @@ type Source struct {
 	Name       string    `json:"name"`
 	UniqueName string    `json:"-"`
 	RepoUrl    string    `json:"repo_url"`
-	CommitTag  string    `json:"commit_tag"`
 	Interval   int       `json:"interval"`
 	State      string    `json:"state"`
 	NextTime   time.Time `json:"next_time"`
 	Secrets    []Secret  `json:"secrets"`
 }
 
-func NewSource(name, repoUrl, commitTag string, startTime time.Time, interval int) (*Source, error) {
+func NewSource(name, repoUrl string, startTime time.Time, interval int) (*Source, error) {
 	name = strings.TrimSpace(name)
 
 	s := &Source{
 		Name:       name,
 		UniqueName: libs.LowerTrimReplaceSpace(name),
 		RepoUrl:    repoUrl,
-		CommitTag:  strings.TrimSpace(commitTag),
 		Interval:   interval,
 		State:      ScheduleNoop,
 		NextTime:   startTime,
@@ -60,11 +58,6 @@ func (s *Source) Validate() error {
 
 	if !libs.IsIn(s.State, []string{ScheduleNoop, ScheduleRunning, ScheduleQueued}) {
 		return errors.Errorf("'%s' is an invalid schedule state", s.State)
-	}
-
-	s.CommitTag = strings.TrimSpace(s.CommitTag)
-	if len(s.CommitTag) > 40 {
-		return errors.New("commit tag must be <= 40 characters")
 	}
 
 	if s.Interval < 30 {

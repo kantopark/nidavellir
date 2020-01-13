@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS source
     name        VARCHAR(100) CHECK ( length(name) >= 4 ) UNIQUE,
     unique_name VARCHAR(100) UNIQUE,
     repo_url    VARCHAR(2000),
-    commit_tag  VARCHAR(40),
     interval    INTEGER     NOT NULL,
     state       VARCHAR(20) NOT NULL,
     next_time   TIMESTAMP   NOT NULL

@@ -17,21 +17,20 @@ func TestNewSource(t *testing.T) {
 	assert := require.New(t)
 
 	tests := []struct {
-		Name      string
-		RepoUrl   string
-		CommitTag string
-		Interval  int
-		HasError  bool
+		Name     string
+		RepoUrl  string
+		Interval int
+		HasError bool
 	}{
-		{"Project", "https://git-repo", "", 30, false},
-		{"123  ", "https://git-repo", "", 30, true},
-		{"Project", "git-repo", "", 30, true},
-		{"Project", "http://git-repo", strings.Repeat("a", 41), 30, true},
-		{"Project", "https://git-repo", "random-tag", 29, true},
+		{"Project", "https://git-repo", 30, false},
+		{"123  ", "https://git-repo", 30, true},
+		{"Project", "git-repo", 30, true},
+		{"Project", "http://git-repo", 30, true},
+		{"Project", "https://git-repo", 29, true},
 	}
 
 	for _, test := range tests {
-		s, err := NewSource(test.Name, test.RepoUrl, test.CommitTag, time.Now(), test.Interval)
+		s, err := NewSource(test.Name, test.RepoUrl, time.Now(), test.Interval)
 		if test.HasError {
 			assert.Error(err)
 			assert.Nil(s)
@@ -220,15 +219,14 @@ func TestPostgres_UpdateSource(t *testing.T) {
 func newSources() ([]Source, error) {
 	var sources []Source
 	for _, i := range []struct {
-		Name      string
-		RepoUrl   string
-		CommitTag string
-		Interval  int
+		Name     string
+		RepoUrl  string
+		Interval int
 	}{
-		{"Project 1", "https://git-repo", "", 30},
-		{"Project 2", "https://git-repo", "0.0.1", 30},
+		{"Project 1", "https://git-repo", 30},
+		{"Project 2", "https://git-repo", 30},
 	} {
-		s, err := NewSource(i.Name, i.RepoUrl, i.CommitTag, time.Now(), i.Interval)
+		s, err := NewSource(i.Name, i.RepoUrl, time.Now(), i.Interval)
 		if err != nil {
 			return nil, err
 		}
