@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"nidavellir/libs"
 )
 
 type Container struct {
@@ -27,6 +29,11 @@ type ContainerRunOptions struct {
 	Ports   map[int]int
 	Volumes map[string]string
 	Daemon  bool
+
+	// These are not docker container run specs specifically
+
+	// Working directory
+	WorkDir string
 }
 
 func (o *ContainerRunOptions) imageTag() (string, error) {
@@ -83,6 +90,10 @@ func (c *Container) Run(options *ContainerRunOptions) (logs string, err error) {
 	args = append(args, options.Cmd...)
 
 	cmd := exec.Command("docker", args...)
+	if !libs.IsEmptyOrWhitespace(options.WorkDir) && libs.PathExists(options.WorkDir) {
+		cmd.Dir = options.WorkDir
+	}
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", errors.Wrap(err, "error when running container")

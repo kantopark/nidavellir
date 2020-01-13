@@ -21,3 +21,7 @@ func LowerTrim(s string) string {
 func LowerTrimReplaceSpace(s string) string {
 	return strings.Replace(LowerTrim(s), " ", "-", -1)
 }
+
+func IsEmptyOrWhitespace(s string) bool {
+	return strings.TrimSpace(s) == ""
+}
