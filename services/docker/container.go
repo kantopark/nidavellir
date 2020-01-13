@@ -29,6 +29,7 @@ type ContainerRunOptions struct {
 	Ports   map[int]int
 	Volumes map[string]string
 	Daemon  bool
+	Network string
 
 	// These are not docker container run specs specifically
 
@@ -68,8 +69,12 @@ func (c *Container) Run(options *ContainerRunOptions) (logs string, err error) {
 		args = append(args, "-p", fmt.Sprintf("%d:%d", host, target))
 	}
 
-	if name := strings.TrimSpace(options.Name); name != "" {
-		args = append(args, "--name", name)
+	if !libs.IsEmptyOrWhitespace(options.Name) {
+		args = append(args, "--name", options.Name)
+	}
+
+	if !libs.IsEmptyOrWhitespace(options.Network) {
+		args = append(args, "--network", options.Network)
 	}
 
 	if restart := strings.TrimSpace(options.Restart); restart == "" {
