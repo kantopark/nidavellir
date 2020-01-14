@@ -1,17 +1,6 @@
-package docker
+package dkutils
 
-import (
-	"errors"
-	"os/exec"
-	"strings"
-)
-
-func SystemCheck() error {
-	if _, err := exec.LookPath("docker"); err != nil {
-		return errors.New("docker is required")
-	}
-	return nil
-}
+import "strings"
 
 func SplitOutput(output []byte) []string {
 	var results []string
