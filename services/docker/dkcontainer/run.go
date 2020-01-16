@@ -1,9 +1,8 @@
-package docker
+package dkcontainer
 
 import (
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -11,14 +10,7 @@ import (
 	"nidavellir/libs"
 )
 
-type Container struct {
-}
-
-func NewContainer() *Container {
-	return &Container{}
-}
-
-type ContainerRunOptions struct {
+type RunOptions struct {
 	Image string
 	Tag   string
 	Name  string
@@ -37,7 +29,7 @@ type ContainerRunOptions struct {
 	WorkDir string
 }
 
-func (o *ContainerRunOptions) imageTag() (string, error) {
+func (o *RunOptions) imageTag() (string, error) {
 	o.Image = strings.TrimSpace(o.Image)
 	o.Tag = strings.TrimSpace(o.Tag)
 	if o.Image == "" {
@@ -50,7 +42,7 @@ func (o *ContainerRunOptions) imageTag() (string, error) {
 	return fmt.Sprintf("%s:%s", o.Image, o.Tag), nil
 }
 
-func (c *Container) Run(options *ContainerRunOptions) (logs string, err error) {
+func Run(options *RunOptions) (logs string, err error) {
 	args := []string{"container", "run"}
 
 	if options.Daemon {
@@ -105,72 +97,4 @@ func (c *Container) Run(options *ContainerRunOptions) (logs string, err error) {
 	}
 
 	return string(output), nil
-}
-
-type ContainerStopOptions struct {
-	Name string
-	Port int
-}
-
-func (c *Container) Stop(options *ContainerStopOptions) (logs string, err error) {
-	containers, err := c.Search(&ContainerSearchOptions{
-		Name: options.Name,
-		Port: options.Port,
-	})
-	if err != nil {
-		return "", errors.Wrap(err, "could not find any containers to stop")
-	}
-
-	for _, id := range containers {
-		cmd := exec.Command("docker", "container", "rm", "-f", id)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return "", errors.Wrapf(err, "could not stop container '%s'", id)
-		}
-		logs += string(output) + "\n"
-	}
-	return
-}
-
-type ContainerSearchOptions struct {
-	Name string
-	Port int
-}
-
-func (c *Container) Search(options *ContainerSearchOptions) ([]string, error) {
-	sep := "::"
-	cmd := exec.Command("docker", "container", "list", "-a", "--format", "{{.Names}}"+sep+"{{.Ports}}"+sep+"{{.ID}}")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get list of containers")
-	}
-
-	idMap := make(map[string]int)
-	for _, namesPorts := range splitOutput(output) {
-		parts := strings.Split(namesPorts, "::")
-		id := parts[2]
-
-		for _, name := range strings.Split(parts[0], ",") {
-			if options.Name != "" && name == options.Name {
-				idMap[id] = 0
-			}
-		}
-
-		for _, fullAddress := range strings.Split(parts[1], ",") {
-			if addresses := strings.Split(fullAddress, "->"); len(addresses) == 2 {
-				if _parts := strings.Split(addresses[0], ":"); len(_parts) == 2 {
-					if port, err := strconv.Atoi(_parts[1]); err == nil && options.Port == port {
-						idMap[id] = 0
-					}
-				}
-			}
-		}
-	}
-
-	var ids []string
-	for k := range idMap {
-		ids = append(ids, k)
-	}
-
-	return ids, nil
 }
