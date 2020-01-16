@@ -19,9 +19,9 @@ type Runtime struct {
 }
 
 type Setup struct {
-	Type         string `yaml:"type"`
-	Tag          string `yaml:"tag"`
-	Requirements bool   `yaml:"requirements"`
+	Build  bool   `yaml:"build"`
+	Commit string `yaml:"commit"`
+	Image  string `yaml:"image"`
 }
 
 type Step struct {
@@ -75,10 +75,14 @@ func NewRuntime(path string) (*Runtime, error) {
 }
 
 func (s *Setup) format(workDir string) error {
-	s.Type = libs.LowerTrim(s.Type)
-	tag := libs.LowerTrim(s.Tag)
+	s.Image = strings.TrimSpace(s.Image)
+	if s.Image == "" {
+		return errors.Errorf("image cannot be empty")
+	}
 
-	if tag == "" || tag == "master" || tag == "latest" {
+	commit := libs.LowerTrim(s.Commit)
+
+	if commit == "" || commit == "master" || commit == "latest" {
 		// gets latest tag since tag not specified
 		cmd := exec.Command("git", "rev-parse", "master")
 		cmd.Dir = workDir
@@ -86,21 +90,21 @@ func (s *Setup) format(workDir string) error {
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return errors.Wrap(err, "could not get latest git commit hash")
 		} else {
-			tag = strings.TrimSpace(string(output))
+			commit = strings.TrimSpace(string(output))
 		}
 	} else {
 		// check specified tag exists
-		cmd := exec.Command("git", "rev-parse", "--verify", tag)
+		cmd := exec.Command("git", "rev-parse", "--verify", commit)
 		cmd.Dir = workDir
 
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return errors.Wrap(err, "could not verify if hash or commit is valid")
 		} else if strings.HasPrefix(strings.TrimSpace(string(output)), "fatal") {
-			return errors.Errorf("%s is not a valid commit or tag", tag)
+			return errors.Errorf("%s is not a valid commit or tag", commit)
 		}
 	}
 
-	s.Tag = tag
+	s.Commit = commit
 
 	return nil
 }
