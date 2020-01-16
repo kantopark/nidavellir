@@ -3,6 +3,7 @@ package repo
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -12,23 +13,15 @@ import (
 )
 
 type Builder struct {
-	WorkDir     string
-	Image       string
-	CommitTag   string
-	BuildArgs   map[string]string
-	RuntimeType string
+	WorkDir    string
+	Image      string
+	BuildArgs  map[string]string
+	dockerfile string
 }
 
-func NewImageBuilder(imageName, commitTag, workDir, runtimeType string) (*Builder, error) {
+func NewImageBuilder(image, workDir string) (*Builder, error) {
 	if !libs.PathExists(workDir) {
 		return nil, errors.New("directory does not exist")
-	}
-
-	imageName = strings.TrimSpace(imageName)
-	if imageName == "" {
-		return nil, errors.New("image name cannot be empty")
-	} else if strings.Contains(imageName, ":") {
-		return nil, errors.New("image name should not contain ':'")
 	}
 
 	conf, err := config.New()
@@ -36,35 +29,20 @@ func NewImageBuilder(imageName, commitTag, workDir, runtimeType string) (*Builde
 		return nil, err
 	}
 
+	dockerfile := filepath.Join(workDir, "Dockerfile")
+	if !libs.PathExists(dockerfile) {
+		return nil, errors.New("dockerfile missing")
+	}
+
 	return &Builder{
-		WorkDir:     workDir,
-		Image:       fmt.Sprintf("%s:%s", imageName, commitTag),
-		CommitTag:   commitTag,
-		BuildArgs:   conf.Image.BuildArgs,
-		RuntimeType: runtimeType,
+		WorkDir:   workDir,
+		Image:     image,
+		BuildArgs: conf.Image.BuildArgs,
 	}, nil
 }
 
 func (b *Builder) Build() (logs string, err error) {
-	file, err := b.prepareDockerfile()
-	if err != nil {
-		return "", err
-	}
-
-	if file == "" {
-		return "image is updated and thus not built", nil
-	}
-
-	logs, err = b.buildImage(file)
-	if err != nil {
-		return logs, err
-	}
-
-	return
-}
-
-func (b *Builder) buildImage(file string) (string, error) {
-	args := []string{"image", "build", "-f", file, "--tag", b.Image}
+	args := []string{"image", "build", "-f", b.dockerfile, "--tag", b.Image}
 
 	for key, value := range b.BuildArgs {
 		args = append(args, "--build-arg", fmt.Sprintf("%s=%s", key, value))
@@ -87,50 +65,8 @@ func (b *Builder) ImageExists() (bool, error) {
 	return ImageExists(b.Image)
 }
 
-// Based on the runtime setup type, generates a Dockerfile. If there are any changes to the
-// Dockerfile, a build.Dockerfile will be created in the working repository. The presence of
-// this file will cause the function to return "build.Dockerfile" which will then trigger an
-// image build. If no changes, an empty string is returned which will not trigger any builds
-func (b *Builder) prepareDockerfile() (string, error) {
-	file, err := NewDockerfile(b.RuntimeType, b.WorkDir)
-	if err != nil {
-		return "", err
-	}
-
-	switch b.RuntimeType {
-	case "dockerfile":
-		if err := file.loadContent(); err != nil {
-			return "", err
-		}
-
-		file.writeBuildArgs(b.BuildArgs)
-
-	case "python", "r":
-		if err := file.fetchFile(); err != nil {
-			return "", err
-		}
-
-		file.writeBuildArgs(b.BuildArgs)
-		if err := file.writeRequirements(); err != nil {
-			return "", err
-		}
-
-	default:
-		return "", errors.Errorf("unsupported runtime '%s'", b.RuntimeType)
-	}
-
-	if file.HasChanges {
-		if err := file.createDockerfile(); err != nil {
-			return "", err
-		}
-		return file.FilePath, nil
-	}
-
-	return "", nil
-}
-
 // Checks if the given image name exists
-func ImageExists(imageName string) (bool, error) {
+func ImageExists(image string) (bool, error) {
 	args := []string{"image", "list", "--format", "{{.Repository}}"}
 	cmd := exec.Command("docker", args...)
 	output, err := cmd.CombinedOutput()
@@ -139,7 +75,7 @@ func ImageExists(imageName string) (bool, error) {
 	}
 
 	for _, name := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		if strings.TrimSpace(name) == imageName {
+		if strings.TrimSpace(name) == image {
 			return true, nil
 		}
 	}

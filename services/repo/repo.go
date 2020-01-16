@@ -27,8 +27,10 @@ type Repo struct {
 
 	// runtime configurations for the repo's tasks
 	Runtime *Runtime
-	// git hash or tag to check out
-	CommitTag string
+	// git commit to check out
+	Commit string
+	// Image name used by the repo. Should ideally contain the tags as well
+	Image string
 }
 
 // Creates a new repository given the source (remote gitlab or github url) and
@@ -57,11 +59,12 @@ func NewRepo(source, name string) (*Repo, error) {
 		return nil, err
 	}
 
-	r.CommitTag = r.Runtime.Setup.Tag
+	r.Commit = r.Runtime.Setup.Commit
+	r.Image = r.Runtime.Setup.Image
 
 	// Checkout repo
 	if err := r.Checkout(); err != nil {
-		return nil, errors.Wrapf(err, "could not checkout '%s' for repo", r.CommitTag)
+		return nil, errors.Wrapf(err, "could not checkout '%s' for repo", r.Commit)
 	}
 
 	return r, nil
@@ -103,21 +106,35 @@ func (r *Repo) Exists() bool {
 }
 
 // Determines whether an image needs to be built or not. An image should only be built
-// if the Runtime.Setup.Type == Dockerfile or if the image specifies a requirement.txt
-// in Runtime.Setup.Requirements
+// if the Runtime.Setup.Build == true
 func (r *Repo) NeedsBuildImage() bool {
-	return r.Runtime.Setup.Type == "dockerfile" || r.Runtime.Setup.Requirements
+	return r.Runtime.Setup.Build
+}
+
+// Checks if the image required by the repository exists
+func (r *Repo) HasImage() (bool, error) {
+	return ImageExists(r.Image)
+}
+
+// Attempts to pull the image
+func (r *Repo) PullImage() (string, error) {
+	cmd := exec.Command("docker", "image", "pull", r.Image)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
 }
 
 // Builds the image for the repository given the setup instructions from
 // the runtime config
 func (r *Repo) BuildImage() (string, error) {
-	b, err := NewImageBuilder(r.Name, r.CommitTag, r.WorkDir, r.Runtime.Setup.Type)
+	b, err := NewImageBuilder(r.Runtime.Setup.Image, r.WorkDir)
 	if err != nil {
 		return "", err
 	}
 
-	if exists, err := b.ImageExists(); err != nil {
+	if exists, err := ImageExists(r.Image); err != nil {
 		return "", err
 	} else if exists {
 		return "", err
@@ -175,23 +192,23 @@ func (r *Repo) Checkout() error {
 		return err
 	}
 
-	if masterHash == r.CommitTag {
+	if masterHash == r.Commit {
 		// no changes to the commit. master is same as tag
 		return nil
 	}
 
 	// master hash not equal to commit hash. Checkout commit
-	cmd := exec.Command("git", "checkout", r.CommitTag)
+	cmd := exec.Command("git", "checkout", r.Commit)
 	cmd.Dir = r.WorkDir
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "could not checkout '%s'", r.CommitTag)
+		return errors.Wrapf(err, "could not checkout '%s'", r.Commit)
 	}
 
 	logs := strings.TrimSpace(string(output))
 	if strings.HasPrefix(logs, "error") {
-		return errors.Wrapf(err, "could not checkout '%s'", r.CommitTag)
+		return errors.Wrapf(err, "could not checkout '%s'", r.Commit)
 	}
 
 	return nil
