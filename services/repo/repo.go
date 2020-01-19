@@ -54,6 +54,13 @@ func NewRepo(source, name string) (*Repo, error) {
 		WorkDir: workDir,
 	}
 
+	if !r.Exists() {
+		err := r.Clone()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	r.Runtime, err = RuntimeFromDir(workDir)
 	if err != nil {
 		return nil, err
