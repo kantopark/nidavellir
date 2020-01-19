@@ -67,7 +67,15 @@ func (b *Builder) ImageExists() (bool, error) {
 
 // Checks if the given image name exists
 func ImageExists(image string) (bool, error) {
-	args := []string{"image", "list", "--format", "{{.Repository}}"}
+	hasTag := strings.Contains(image, ":")
+
+	args := []string{"image", "list", "--format"}
+	if hasTag {
+		args = append(args, "{{.Repository}}:{{.Tag}}")
+	} else {
+		args = append(args, "{{.Repository}}")
+	}
+
 	cmd := exec.Command("docker", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
