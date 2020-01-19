@@ -128,7 +128,7 @@ func (r *Repo) PullImage() (string, error) {
 	cmd := exec.Command("docker", "image", "pull", r.Image)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, string(output))
 	}
 	return string(output), nil
 }
