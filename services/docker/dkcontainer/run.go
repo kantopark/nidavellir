@@ -93,7 +93,7 @@ func Run(options *RunOptions) (logs string, err error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", errors.Wrap(err, "error when running container")
+		return "", errors.Wrap(err, string(output))
 	}
 
 	return string(output), nil
