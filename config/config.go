@@ -12,7 +12,7 @@ import (
 type Config struct {
 	Admin   adminConfig   `mapstructure:"admin"`
 	Image   imageConfig   `mapstructure:"image"`
-	WorkDir workDirConfig `mapstructure:"work-dir"`
+	WorkDir workDirConfig `mapstructure:"workdir"`
 }
 
 func New() (*Config, error) {
