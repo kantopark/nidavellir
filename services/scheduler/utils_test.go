@@ -1,19 +1,41 @@
 package scheduler_test
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/dhui/dktest"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
 	"nidavellir/services/repo"
 )
 
-var jobIds chan int
+var (
+	jobIds      chan int
+	user        = "user"
+	password    = "password"
+	dbName      = "db"
+	imageName   = "postgres:12-alpine"
+	postgresEnv = map[string]string{
+		"POSTGRES_USER":     user,
+		"POSTGRES_PASSWORD": password,
+		"POSTGRES_DB":       dbName,
+	}
+	postgresImageOptions = dktest.Options{
+		ReadyFunc:    dbReady,
+		PortRequired: true,
+		ReadyTimeout: 5 * time.Minute,
+		Env:          postgresEnv,
+	}
+)
 
 func init() {
 	fileInfo, err := ioutil.ReadDir(os.TempDir())
@@ -21,6 +43,7 @@ func init() {
 		log.Fatalln(err)
 	}
 
+	// Remove past nida folders
 	for _, f := range fileInfo {
 		if strings.HasPrefix(f.Name(), "nida-") {
 			err := os.RemoveAll(filepath.Join(os.TempDir(), f.Name()))
@@ -30,19 +53,48 @@ func init() {
 		}
 	}
 
+	// creates a temporary directory in the user's temp folder which would be used to store
+	// the repositories, outputs, etc.
 	dir, err := ioutil.TempDir("", "nida-")
 	if err != nil {
 		log.Fatalln(err)
 	}
+	viper.Set("workdir.path", dir)
 
-	jobIds = make(chan int, 100)
-	for i := 0; i < 100; i++ {
+	// creates a finite number of jobIds to mock jobs ids in database
+	size := 1000
+	jobIds = make(chan int, size)
+	for i := 0; i < size; i++ {
 		jobIds <- i
 	}
-
-	viper.Set("workdir.path", dir)
 }
 
+func connectionString(c dktest.ContainerInfo) (string, error) {
+	ip, port, err := c.FirstPort()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", ip, port, user, password, dbName), nil
+}
+
+func dbReady(ctx context.Context, c dktest.ContainerInfo) bool {
+	cs, err := connectionString(c)
+	if err != nil {
+		return false
+	}
+
+	db, err := sql.Open("postgres", cs)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = db.Close() }()
+
+	return db.PingContext(ctx) == nil
+}
+
+// Clones a python test repository which would be used by all tests. Each tests should not
+// mutate the contents in this repository
 func newPythonRepo() (*repo.Repo, error) {
 	pythonSource := "https://github.com/kantopark/python-test-repo"
 	rp, err := repo.NewRepo(pythonSource, "python-test-repo")
@@ -69,6 +121,7 @@ func newPythonRepo() (*repo.Repo, error) {
 	return rp, nil
 }
 
+// Gets a unique job id
 func uniqueJobId() int {
 	return <-jobIds
 }
