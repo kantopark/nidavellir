@@ -67,6 +67,12 @@ func init() {
 	for i := 0; i < size; i++ {
 		jobIds <- i
 	}
+
+	// init repos
+	_, err = newPythonRepo()
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func connectionString(c dktest.ContainerInfo) (string, error) {
