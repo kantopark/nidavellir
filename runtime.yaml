@@ -1,0 +1,52 @@
+setup:
+  # when build is true, application will look for a Dockerfile in the repository
+  # and build the image. The image name will be given by the 'image' setting
+  # seen below. The image name must be provided in this case
+  build: false
+  # commit is only used when build is true. This determines which "commit" or
+  # "tag" to checkout from the repository to build the image. If left empty or
+  # given the values "latest" or "master", it will checkout "master"
+  commit:
+  # The image that is used to run the task. If it does not exist in the local
+  # image repository, will attempt to pull it. If provided, the user should
+  # ideally provide the tags as well to "version control" it
+  image: danielbok/python-nida:3.7.5
+
+# global environment variables
+environment:
+  key: value will be a string,
+  key1: "9090"
+  key2: previous value is quoted because yaml can interpret that as a int or decimal
+
+steps:
+  # elements in steps are executed in order with the name representing the step name
+  - name: Extraction
+    environment:
+      stepEnv1: any string value which will be same across all tasks
+    tasks:
+      # elements in list are executed together
+      - name: Extract from DB A
+        cmd: extract_a.py
+        environment:
+          key: overrides global environment "key"
+
+      - name: Extract from DB B
+        cmd: extract_b.py
+
+  - name: Transformation 1
+    tasks:
+      - name: Transform just A
+        cmd: transform_a.py
+
+      - name: Transform A and B together which takes a long time
+        cmd: transform_long.py
+
+  - name: Transformation 2
+    tasks:
+      - name: Combine Previous 2 transformations
+        cmd: transform_2.py
+
+  - name: Store
+    tasks:
+      - name: Save results of transformation 2 to DB C
+        cmd: save.py
