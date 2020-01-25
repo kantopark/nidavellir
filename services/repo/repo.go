@@ -25,12 +25,14 @@ type Repo struct {
 	// Repo's file path. The root of that file path will be the working directory
 	WorkDir string
 
-	// runtime configurations for the repo's tasks
-	Runtime *Runtime
 	// git commit to check out
 	Commit string
 	// Image name used by the repo. Should ideally contain the tags as well
 	Image string
+	// checks if the repo needs to build the image
+	NeedsBuild bool
+
+	Steps []*Step
 }
 
 // Creates a new repository given the source (remote gitlab or github url) and
@@ -61,13 +63,10 @@ func NewRepo(source, name string) (*Repo, error) {
 		}
 	}
 
-	r.Runtime, err = RuntimeFromDir(workDir)
+	err = r.formatRuntimeConfig(workDir)
 	if err != nil {
 		return nil, err
 	}
-
-	r.Commit = r.Runtime.Setup.Commit
-	r.Image = r.Runtime.Setup.Image
 
 	// Checkout repo
 	if err := r.Checkout(); err != nil {
@@ -112,12 +111,6 @@ func (r *Repo) Exists() bool {
 	return libs.PathExists(r.WorkDir)
 }
 
-// Determines whether an image needs to be built or not. An image should only be built
-// if the Runtime.Setup.Build == true
-func (r *Repo) NeedsBuildImage() bool {
-	return r.Runtime.Setup.Build
-}
-
 // Checks if the image required by the repository exists
 func (r *Repo) HasImage() (bool, error) {
 	return ImageExists(r.Image)
@@ -133,10 +126,10 @@ func (r *Repo) PullImage() (string, error) {
 	return string(output), nil
 }
 
-// Builds the image for the repository given the setup instructions from
+// Builds the image for the repository given the rSetup instructions from
 // the runtime config
 func (r *Repo) BuildImage() (string, error) {
-	b, err := NewImageBuilder(r.Runtime.Setup.Image, r.WorkDir)
+	b, err := NewImageBuilder(r.Image, r.WorkDir)
 	if err != nil {
 		return "", err
 	}

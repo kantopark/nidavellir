@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync/atomic"
 	"time"
@@ -11,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"nidavellir/config"
-	"nidavellir/services/repo"
+	rp "nidavellir/services/repo"
 	"nidavellir/services/store"
 )
 
@@ -49,15 +48,16 @@ func (m *JobManager) AddJob(source *store.Source, trigger string) error {
 		return err
 	}
 
-	conf, err := repo.RuntimeFromDir(m.conf.WorkDir.RepoPath(source.UniqueName))
+	repo, err := rp.NewRepo(source.RepoUrl, source.UniqueName)
 	if err != nil {
 		return err
 	}
 
-	tg, err := NewTaskGroup(m.ctx, source, job.Id, source.Name)
+	tg, err := NewTaskGroup(m.ctx, source.Id, job.Id, source.Name, source.RepoUrl, source.UniqueName, repo.Commit, source.NextTime)
 	if err != nil {
 		return err
 	}
+
 	if tg.BuildLog != "" {
 		file, err := os.OpenFile(imageLogPath(tg.Image), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
@@ -66,21 +66,23 @@ func (m *JobManager) AddJob(source *store.Source, trigger string) error {
 		logOutput(file, tg.BuildLog)
 	}
 
-	for i, step := range conf.Steps {
-		var groups []*Task
-		for j, task := range step.Tasks {
-			envVars := taskEnvVar(source.SecretMap(), conf.Env, task.Env, source.NextTime)
+	extraEnvVar := source.SecretMap()
+	extraEnvVar["task_date"] = source.NextTime.Format("2006-01-02 15:04:05")
+	repo.AddEnvVars(extraEnvVar)
 
-			t, err := NewTask(&Task{
-				TaskTag:    fmt.Sprintf("%s_%d-%d", source.UniqueName, i, j),
-				SourceId:   source.Id,
-				SourceName: source.Name,
-				JobId:      job.Id,
-				Step:       step.Step,
-				Name:       task.Name,
-				Cmd:        task.Cmd,
-				Env:        envVars,
-			})
+	for _, step := range repo.Steps {
+		var groups []*Task
+
+		for _, task := range step.Tasks {
+			t, err := NewTask(
+				task.Name,
+				task.Image,
+				task.Tag,
+				task.Cmd,
+				outputDir(job.Id),
+				task.WorkDir,
+				task.Env,
+			)
 			if err != nil {
 				return errors.Wrap(err, "invalid task specifications")
 			}

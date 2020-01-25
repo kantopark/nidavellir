@@ -3,15 +3,15 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 
+	"nidavellir/libs"
 	"nidavellir/services/repo"
-	"nidavellir/services/store"
 )
 
 type TaskGroup struct {
@@ -27,19 +27,45 @@ type TaskGroup struct {
 	sem        *semaphore.Weighted
 }
 
-func NewTaskGroup(ctx context.Context, source *store.Source, jobId int, name string) (*TaskGroup, error) {
+func NewTaskGroup(ctx context.Context, sourceId, jobId int, taskName, repoUrl, repoUniqueName, commitTag string, taskDate time.Time) (*TaskGroup, error) {
 	tg := &TaskGroup{
-		Name:       name,
-		SourceId:   source.Id,
-		TaskDate:   source.NextTime.Format("2006-01-02 15:04:05"),
+		Name:       taskName,
+		SourceId:   sourceId,
+		TaskDate:   taskDate.Format("2006-01-02 15:04:05"),
 		JobId:      jobId,
 		ctx:        ctx,
 		sem:        semaphore.NewWeighted(int64(runtime.NumCPU())),
 		StepGroups: []*StepGroup{},
 	}
 
-	if err := tg.updateImage(source); err != nil {
+	rp, err := repo.NewRepo(repoUrl, repoUniqueName)
+	if err != nil {
 		return nil, err
+	}
+
+	if err := tg.updateRepo(rp); err != nil {
+		return nil, err
+	}
+
+	// Checks if image needs to be built
+	if rp.NeedsBuild {
+		// if so, check that image is updated. If image is updated, don't build, else build
+		err := tg.updateImage(rp, repoUniqueName, commitTag)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// no need to build, but check if image exists, if not pull image
+		hasImage, err := rp.HasImage()
+		if err != nil {
+			return nil, err
+		} else if !hasImage {
+			logs, err := rp.PullImage()
+			if err != nil {
+				return nil, err
+			}
+			tg.BuildLog = logs
+		}
 	}
 
 	return tg, nil
@@ -71,29 +97,21 @@ func (t *TaskGroup) Execute() error {
 	return nil
 }
 
-func (t *TaskGroup) updateImage(source *store.Source) error {
-	// Update repo and check image is updated
-	rp, err := repo.NewRepo(source.RepoUrl, source.UniqueName)
-	if err != nil {
-		return err
-	}
-
-	// clone or update repo
+// Updates the repo to the latest version
+func (t *TaskGroup) updateRepo(rp *repo.Repo) error {
 	if err := rp.Clone(); err != nil {
 		return err
 	}
+	return nil
+}
 
-	// check if image is updated, if not rebuild it
-	commitTag := strings.TrimSpace(source.CommitTag)
-	if commitTag == "" {
-		if hash, err := latestHash(repoDir(source.UniqueName)); err != nil {
-			return err
-		} else {
-			commitTag = hash
-		}
+// Check image is updated
+func (t *TaskGroup) updateImage(rp *repo.Repo, uniqueName, commitTag string) error {
+	if libs.IsEmptyOrWhitespace(commitTag) {
+		return errors.New("commit tag cannot be empty")
 	}
 
-	image := fmt.Sprintf("%s:%s", source.UniqueName, commitTag)
+	image := fmt.Sprintf("%s:%s", uniqueName, commitTag)
 
 	// check if the image exists, if not clone repo and build image
 	if exists, err := repo.ImageExists(image); err != nil {
@@ -108,14 +126,4 @@ func (t *TaskGroup) updateImage(source *store.Source) error {
 
 	t.Image = image
 	return nil
-}
-
-func latestHash(dirname string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "master")
-	cmd.Dir = dirname
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", errors.Wrap(err, "could not get latest hash from repo")
-	}
-	return strings.TrimSpace(string(output)), nil
 }

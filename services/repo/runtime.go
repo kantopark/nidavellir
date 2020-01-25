@@ -12,30 +12,52 @@ import (
 	"nidavellir/libs"
 )
 
-type Runtime struct {
-	Setup Setup             `yaml:"setup"`
+type runtime struct {
+	Setup rSetup            `yaml:"setup"`
 	Env   map[string]string `yaml:"environment"`
-	Steps []Step            `yaml:"steps"`
+	Steps []rStep           `yaml:"steps"`
 }
 
-type Setup struct {
+type rSetup struct {
 	Build  bool   `yaml:"build"`
 	Commit string `yaml:"commit"`
 	Image  string `yaml:"image"`
 }
 
-type Step struct {
-	Step  string `yaml:"step"`
-	Tasks []Task `yaml:"tasks"`
+type rStep struct {
+	Name  string            `yaml:"name"`
+	Tasks []rTask           `yaml:"tasks"`
+	Env   map[string]string `yaml:"environment"`
 }
 
-type Task struct {
+type rTask struct {
 	Name string            `yaml:"name"`
 	Cmd  string            `yaml:"cmd"`
-	Env  map[string]string `yaml:"env"`
+	Env  map[string]string `yaml:"environment"`
 }
 
-func RuntimeFromDir(dir string) (*Runtime, error) {
+func (r *Repo) formatRuntimeConfig(dir string) error {
+	config, err := runtimeFromDir(dir)
+	if err != nil {
+		return err
+	}
+
+	r.Commit = config.Setup.Commit
+	r.Image = config.Setup.Image
+	r.NeedsBuild = config.Setup.Build
+
+	if libs.LowerTrimReplaceSpace(r.WorkDir) == "" {
+		return errors.Errorf("workdir needs to be initialized before initializing steps")
+	}
+
+	r.Steps, err = newSteps(config.Steps, r.Name, r.Image, r.WorkDir, config.Env)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func runtimeFromDir(dir string) (*runtime, error) {
 	info, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read working directory files")
@@ -53,28 +75,24 @@ func RuntimeFromDir(dir string) (*Runtime, error) {
 		return nil, errors.New("no runtime.yaml found in working directory")
 	}
 
-	return NewRuntime(file)
-}
-
-func NewRuntime(path string) (*Runtime, error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read file content")
 	}
 
-	var config Runtime
+	var config runtime
 	if err := yaml.Unmarshal(content, &config); err != nil {
 		return nil, errors.Wrap(err, "could not decode yaml file")
 	}
 
-	if err := config.Setup.format(filepath.Dir(path)); err != nil {
+	if err := config.Setup.format(filepath.Dir(file)); err != nil {
 		return nil, errors.Wrap(err, "could not format tag")
 	}
 
 	return &config, nil
 }
 
-func (s *Setup) format(workDir string) error {
+func (s *rSetup) format(workDir string) error {
 	s.Image = strings.TrimSpace(s.Image)
 	if s.Image == "" {
 		return errors.Errorf("image cannot be empty")
