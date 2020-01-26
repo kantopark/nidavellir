@@ -2,6 +2,9 @@ package scheduler
 
 import (
 	"regexp"
+	"strings"
+
+	"github.com/pkg/errors"
 
 	container "nidavellir/services/docker/dkcontainer"
 )
@@ -20,6 +23,23 @@ type Task struct {
 }
 
 func NewTask(taskName, image, tag, cmd, outputDir, workDir string, env map[string]string) (*Task, error) {
+	taskName = strings.TrimSpace(taskName)
+	if taskName == "" {
+		return nil, errors.Errorf("task name cannot be empty")
+	}
+
+	for name, value := range map[string]string{
+		"task name":        taskName,
+		"image":            image,
+		"task tag":         tag,
+		"command":          cmd,
+		"output directory": outputDir,
+	} {
+		if strings.TrimSpace(value) == "" {
+			return nil, errors.Errorf("%s cannot be empty", name)
+		}
+	}
+
 	return &Task{
 		TaskName:  taskName,
 		TaskTag:   tag,
