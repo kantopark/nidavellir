@@ -1,10 +1,23 @@
-image:
-  build-args:
-    key: useful to put in http_proxy and https_proxy here
-
+# user administration config. Admin account is a super account that can do many
+# many things in the future
 admin:
   username: admin
   password: password  # change this with the environment variable nida_admin.username
 
-workdir:
-  path:  # leave this empty to use the default working directory
+app:
+  # working directory, leave this empty to use the default working directory
+  workdir: ""
+
+# container run and build configuration
+run:
+  # maximum duration each task can run. For valid duration string, see the docs at
+  # https://golang.org/pkg/time/#ParseDuration. Put 0 for unlimited duration.
+  # However, it is recommended to put at least some values else the system will
+  # choke as there could be a task in an infinite loop. The default is 45 min
+  # which should be good for really long running ETL jobs
+  max-duration: 45m
+
+  # environment variables that will be injected when building the image
+  # it is useful to set http proxies in here
+  build-args:
+    key: useful to put in http_proxy and https_proxy here

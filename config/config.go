@@ -10,9 +10,13 @@ import (
 )
 
 type Config struct {
-	Admin   adminConfig   `mapstructure:"admin"`
-	Image   imageConfig   `mapstructure:"image"`
-	WorkDir workDirConfig `mapstructure:"workdir"`
+	Admin adminConfig `mapstructure:"admin"`
+	App   appConfig   `mapstructure:"app"`
+	Run   runConfig   `mapstructure:"run"`
+}
+
+type iValidate interface {
+	Validate() error
 }
 
 func New() (*Config, error) {
@@ -34,12 +38,14 @@ func New() (*Config, error) {
 		return nil, errors.Wrap(err, "could not unmarshal config")
 	}
 
-	if err := config.Admin.Validate(); err != nil {
-		return nil, err
-	}
-
-	if err := config.WorkDir.Validate(); err != nil {
-		return nil, err
+	for _, t := range []iValidate{
+		&config.Admin,
+		&config.App,
+		&config.Run,
+	} {
+		if err := t.Validate(); err != nil {
+			return nil, err
+		}
 	}
 
 	return &config, nil
@@ -72,4 +78,8 @@ func setConfigDirectory() error {
 	viper.AddConfigPath(workDir)
 
 	return nil
+}
+
+func validate(t iValidate) error {
+	return t.Validate()
 }

@@ -47,7 +47,7 @@ func NewRepo(source, name string) (*Repo, error) {
 		return nil, err
 	}
 
-	workDir := conf.WorkDir.RepoPath(name)
+	workDir := conf.App.RepoPath(name)
 	r := &Repo{
 		Source:  source,
 		Name:    libs.LowerTrimReplaceSpace(name),

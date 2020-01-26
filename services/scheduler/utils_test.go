@@ -60,7 +60,7 @@ func init() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	viper.Set("workdir.path", dir)
+	viper.Set("app.workdir", dir)
 
 	// creates a finite number of jobIds to mock jobs ids in database
 	size := 1000
@@ -139,5 +139,5 @@ func outputDir(jobId int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return conf.WorkDir.OutputDir(jobId), nil
+	return conf.App.OutputDir(jobId), nil
 }

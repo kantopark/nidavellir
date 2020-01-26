@@ -37,7 +37,7 @@ func NewImageBuilder(image, workDir string) (*Builder, error) {
 	return &Builder{
 		WorkDir:   workDir,
 		Image:     image,
-		BuildArgs: conf.Image.BuildArgs,
+		BuildArgs: conf.Run.BuildArgs,
 	}, nil
 }
 
