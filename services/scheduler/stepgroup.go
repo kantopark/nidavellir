@@ -12,12 +12,14 @@ import (
 )
 
 type StepGroup struct {
+	Name  string
 	tasks []*Task
 	sep   string
 }
 
-func NewStepGroup(tasks []*Task) *StepGroup {
+func NewStepGroup(name string, tasks []*Task) *StepGroup {
 	return &StepGroup{
+		Name:  name,
 		tasks: tasks,
 		sep:   fmt.Sprintf("\n\n%s\n\n", strings.Repeat("-", 100)),
 	}
@@ -29,6 +31,7 @@ func (s *StepGroup) SetImage(image string) {
 	}
 }
 
+// Executes all tasks within step group in parallel subject to the semaphore weights
 func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (string, error) {
 	var errs error
 	errCh := make(chan error, 1)
@@ -37,7 +40,6 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 
 	// set wait group to wait for number of tasks in the current step
 	var wg sync.WaitGroup
-	wg.Add(len(s.tasks))
 
 	// for each task in step, acquire a semaphore and execute task. Once task is complete,
 	// release the semaphore and reduce wait group count
@@ -46,15 +48,8 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 			errCh <- errors.Wrap(err, "could not acquire semaphore lock to execute tasks")
 			continue
 		}
-		go func() {
-			defer sem.Release(1)
-			defer wg.Done()
-			if logs, err := task.Execute(); err != nil {
-				errCh <- err
-			} else {
-				ls.Append(logs)
-			}
-		}()
+		wg.Add(1)
+		go runTask(sem, &wg, task, errCh, ls)
 	}
 
 	// Put the wait group in a go routine. This ensures the done channel is only closed when
@@ -72,7 +67,21 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 		case <-done:
 			// case when the done channel is closed cause all tasks executed successfully,
 			// return errors if any
-			return ls.Join(s.sep), errs
+			return fmt.Sprintf("Step Group: %s\n%s\n\n", s.Name, ls.Join(s.sep)), errs
 		}
+	}
+}
+
+func runTask(sem *semaphore.Weighted, wg *sync.WaitGroup, task *Task, errCh chan<- error, ls *LogSlice) {
+	defer sem.Release(1)
+	defer wg.Done()
+	if logs, err := task.Execute(); err != nil {
+		errCh <- errors.Wrapf(err, "error executing task: %s", task.TaskName)
+	} else {
+		ls.Append(fmt.Sprintf(`
+Task: %s
+
+%s
+`, task.TaskName, logs))
 	}
 }

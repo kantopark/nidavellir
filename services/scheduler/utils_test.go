@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"nidavellir/config"
 	"nidavellir/services/repo"
 )
 
@@ -130,4 +131,13 @@ func newPythonRepo() (*repo.Repo, error) {
 // Gets a unique job id
 func uniqueJobId() int {
 	return <-jobIds
+}
+
+// Gets output directory for test job
+func outputDir(jobId int) (string, error) {
+	conf, err := config.New()
+	if err != nil {
+		return "", err
+	}
+	return conf.WorkDir.OutputDir(jobId), nil
 }

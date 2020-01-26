@@ -10,12 +10,12 @@ import (
 )
 
 type Step struct {
-	Name  string
-	Tasks []*Task
-	Env   map[string]string
+	Name         string
+	TaskInfoList []*TaskInfo
+	Env          map[string]string
 }
 
-type Task struct {
+type TaskInfo struct {
 	Name    string
 	Tag     string
 	Image   string
@@ -48,9 +48,9 @@ func newSteps(steps []rStep, repoName, image, repoDir string, globalEnv map[stri
 
 func (s *rStep) newStepGroup(repoName, image, repoDir string, globalEnv map[string]string) (*Step, error) {
 	sg := &Step{
-		Name:  s.Name,
-		Tasks: nil,
-		Env:   make(map[string]string),
+		Name:         s.Name,
+		TaskInfoList: nil,
+		Env:          make(map[string]string),
 	}
 
 	// global env has less priority
@@ -68,17 +68,17 @@ func (s *rStep) newStepGroup(repoName, image, repoDir string, globalEnv map[stri
 
 	for _, t := range s.Tasks {
 		task := t.newTask(repoName, s.Name, image, repoDir, sg.Env)
-		sg.Tasks = append(sg.Tasks, task)
+		sg.TaskInfoList = append(sg.TaskInfoList, task)
 	}
 
 	return sg, nil
 }
 
-func (t *rTask) newTask(repoName, stepName, image, repoDir string, stepEnv map[string]string) *Task {
+func (t *rTask) newTask(repoName, stepName, image, repoDir string, stepEnv map[string]string) *TaskInfo {
 	f := libs.LowerTrimReplaceSpace
-	task := &Task{
+	task := &TaskInfo{
 		Name:    t.Name,
-		Tag:     fmt.Sprintf("%s:%s:%s", f(repoName), f(stepName), f(t.Name)),
+		Tag:     fmt.Sprintf("%s__%s__%s", f(repoName), f(stepName), f(t.Name)),
 		Image:   image,
 		Cmd:     t.Cmd,
 		WorkDir: repoDir,
@@ -100,7 +100,7 @@ func (t *rTask) newTask(repoName, stepName, image, repoDir string, stepEnv map[s
 // Adds any environment variable to all tasks in repo steps. This variables will take priority
 func (r *Repo) AddEnvVars(env map[string]string) {
 	for _, sg := range r.Steps {
-		for _, task := range sg.Tasks {
+		for _, task := range sg.TaskInfoList {
 			for k, v := range env {
 				task.Env[k] = v
 			}
