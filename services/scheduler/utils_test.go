@@ -16,7 +16,6 @@ import (
 	"github.com/spf13/viper"
 
 	"nidavellir/config"
-	"nidavellir/services/repo"
 )
 
 var (
@@ -68,12 +67,7 @@ func init() {
 	for i := 0; i < size; i++ {
 		jobIds <- i
 	}
-
-	// init repos
-	_, err = newPythonRepo()
-	if err != nil {
-		log.Fatalln(err)
-	}
+	initRepos()
 }
 
 func connectionString(c dktest.ContainerInfo) (string, error) {
@@ -98,34 +92,6 @@ func dbReady(ctx context.Context, c dktest.ContainerInfo) bool {
 	defer func() { _ = db.Close() }()
 
 	return db.PingContext(ctx) == nil
-}
-
-// Clones a python test repository which would be used by all tests. Each tests should not
-// mutate the contents in this repository
-func newPythonRepo() (*repo.Repo, error) {
-	pythonSource := "https://github.com/kantopark/python-test-repo"
-	rp, err := repo.NewRepo(pythonSource, "python-test-repo")
-	if err != nil {
-		return nil, err
-	}
-
-	if !rp.Exists() {
-		err := rp.Clone()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if exists, err := rp.HasImage(); err != nil {
-		return nil, err
-	} else if !exists {
-		_, err := rp.PullImage()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return rp, nil
 }
 
 // Gets a unique job id

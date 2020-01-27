@@ -47,10 +47,7 @@ func TestNewTask(t *testing.T) {
 func TestTask_Execute(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
-
-	// clone a test repo and get path
-	repo, err := newPythonRepo()
-	assert.NoError(err)
+	repo := pythonRepo
 
 	jobId := uniqueJobId()
 	outputDir, err := outputDir(jobId)
