@@ -45,7 +45,6 @@ func TestNewTask(t *testing.T) {
 }
 
 func TestTask_Execute(t *testing.T) {
-	t.Parallel()
 	assert := require.New(t)
 	repo := pythonRepo
 

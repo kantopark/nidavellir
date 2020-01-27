@@ -5,36 +5,42 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
+
+	"nidavellir/config"
+	"nidavellir/libs"
 )
 
 type StepGroup struct {
 	Name  string
 	tasks []*Task
 	sep   string
+	dur   time.Duration
 }
 
-func NewStepGroup(name string, tasks []*Task) *StepGroup {
+func NewStepGroup(name string, tasks []*Task) (*StepGroup, error) {
+	conf, err := config.New()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create StepGroup")
+	}
+
 	return &StepGroup{
-		Name:  name,
+		Name:  strings.TrimSpace(name),
 		tasks: tasks,
 		sep:   fmt.Sprintf("\n\n%s\n\n", strings.Repeat("-", 100)),
-	}
-}
-
-func (s *StepGroup) SetImage(image string) {
-	for _, task := range s.tasks {
-		task.Image = image
-	}
+		dur:   conf.Run.MaxDuration,
+	}, nil
 }
 
 // Executes all tasks within step group in parallel subject to the semaphore weights
 func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (string, error) {
 	var errs error
-	errCh := make(chan error, 1)
+	errCh := make(chan error, len(s.tasks))
 	done := make(chan bool, 1)
 	ls := NewLogSlice()
 
@@ -49,7 +55,7 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 			continue
 		}
 		wg.Add(1)
-		go runTask(sem, &wg, task, errCh, ls)
+		go runTask(sem, &wg, ctx, task, errCh, ls)
 	}
 
 	// Put the wait group in a go routine. This ensures the done channel is only closed when
@@ -72,16 +78,57 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 	}
 }
 
-func runTask(sem *semaphore.Weighted, wg *sync.WaitGroup, task *Task, errCh chan<- error, ls *LogSlice) {
+func runTask(sem *semaphore.Weighted, wg *sync.WaitGroup, ctx context.Context, task *Task, errCh chan<- error, ls *LogSlice) {
 	defer sem.Release(1)
 	defer wg.Done()
-	if logs, err := task.Execute(); err != nil {
-		errCh <- errors.Wrapf(err, "error executing task: %s", task.TaskName)
-	} else {
-		ls.Append(fmt.Sprintf(`
+	logCh := make(chan string)
+
+	conf, err := config.New()
+	if err != nil {
+		log.Fatal(errors.Wrap(err, "could not execute tasks as config cannot be read"))
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, conf.Run.MaxDuration)
+	defer cancel() // this function is called when task executes finishes early and will release resources
+
+	go func() {
+		if logs, err := task.Execute(); err != nil {
+			errCh <- errors.Wrapf(err, "error executing task: %s", task.TaskName)
+		} else {
+			logCh <- fmt.Sprintf(`
 Task: %s
 
 %s
-`, task.TaskName, logs))
+`, task.TaskName, logs)
+		}
+	}()
+
+	select {
+	case logs := <-logCh:
+		ls.Append(logs)
+	case <-ctx.Done():
+		errCh <- ctx.Err()
 	}
+}
+
+func (s *StepGroup) Validate() error {
+	var errs error
+	if libs.IsEmptyOrWhitespace(s.Name) {
+		errs = multierror.Append(errs, errors.New("name cannot be empty"))
+	}
+
+	if len(s.tasks) == 0 {
+		errs = multierror.Append(errs, errors.New("StepGroup has no tasks"))
+	}
+
+	taskNameMap := make(map[string]int, len(s.tasks))
+	for i, task := range s.tasks {
+		if j, exists := taskNameMap[task.TaskTag]; exists {
+			errs = multierror.Append(errs, errors.Errorf("task %d and task %d has repeated tag name '%s'", i, j, task.TaskTag))
+		} else {
+			taskNameMap[task.TaskTag] = i
+		}
+	}
+
+	return nil
 }
