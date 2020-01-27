@@ -29,12 +29,17 @@ func NewStepGroup(name string, tasks []*Task) (*StepGroup, error) {
 		return nil, errors.Wrap(err, "could not create StepGroup")
 	}
 
-	return &StepGroup{
+	sg := &StepGroup{
 		Name:  strings.TrimSpace(name),
 		tasks: tasks,
 		sep:   fmt.Sprintf("\n\n%s\n\n", strings.Repeat("-", 100)),
 		dur:   conf.Run.MaxDuration,
-	}, nil
+	}
+
+	if err := sg.Validate(); err != nil {
+		return nil, err
+	}
+	return sg, nil
 }
 
 // Executes all tasks within step group in parallel subject to the semaphore weights
