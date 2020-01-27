@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -10,120 +11,171 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 
-	"nidavellir/libs"
 	"nidavellir/services/repo"
 )
 
 type TaskGroup struct {
-	JobId      int
 	Name       string
-	SourceId   int
 	StepGroups []*StepGroup
-	Image      string
-	BuildLog   string
-	RunLog     string
-	TaskDate   string
 	ctx        context.Context
 	sem        *semaphore.Weighted
+	rp         *repo.Repo
+	SourceId   int
+	JobId      int
+	TaskDate   string
 }
 
-func NewTaskGroup(ctx context.Context, sourceId, jobId int, taskName, repoUrl, repoUniqueName, commitTag string, taskDate time.Time) (*TaskGroup, error) {
+func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time) (*TaskGroup, error) {
 	tg := &TaskGroup{
-		Name:       taskName,
-		SourceId:   sourceId,
-		TaskDate:   taskDate.Format("2006-01-02 15:04:05"),
-		JobId:      jobId,
+		Name:       rp.Name,
 		ctx:        ctx,
+		rp:         rp,
 		sem:        semaphore.NewWeighted(int64(runtime.NumCPU())),
 		StepGroups: []*StepGroup{},
+		SourceId:   sourceId,
+		JobId:      jobId,
+		TaskDate:   taskDate.Format("2006-01-02 15:04:05"),
 	}
 
-	rp, err := repo.NewRepo(repoUrl, repoUniqueName)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tg.updateRepo(rp); err != nil {
+	if err := tg.updateRepo(); err != nil {
 		return nil, err
 	}
 
 	// Checks if image needs to be built
 	if rp.NeedsBuild {
 		// if so, check that image is updated. If image is updated, don't build, else build
-		err := tg.updateImage(rp, repoUniqueName, commitTag)
+		err := tg.updateImage()
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	} else if err := tg.pullImage(); err != nil {
 		// no need to build, but check if image exists, if not pull image
-		hasImage, err := rp.HasImage()
-		if err != nil {
-			return nil, err
-		} else if !hasImage {
-			logs, err := rp.PullImage()
-			if err != nil {
-				return nil, err
-			}
-			tg.BuildLog = logs
-		}
+		return nil, err
+	}
+
+	if err := tg.addStepGroups(); err != nil {
+		return nil, errors.Wrap(err, "could not create TaskGroup due to errors in StepGroup configuration")
 	}
 
 	return tg, nil
 }
 
-// Adds tasks of the same level to the task group, the order in which these tasks are
-// added will determine the order of execution
-func (t *TaskGroup) AddTasks(tasks []*Task) {
-	sg := NewStepGroup(tasks)
-	t.StepGroups = append(t.StepGroups, sg)
+// Adds any environment variable to all tasks in the TaskGroup. These variables will have higher priority
+func (t *TaskGroup) AddEnvVar(env map[string]string) {
+	for _, sg := range t.StepGroups {
+		for _, task := range sg.Tasks {
+			for k, v := range env {
+				task.Env[k] = v
+			}
+		}
+	}
 }
 
-func (t *TaskGroup) Execute() error {
+func (t *TaskGroup) Execute() (string, error) {
 	var logArray []string
-	sep := fmt.Sprintf("\n%s\n", strings.Repeat("=", 100))
+
+	formatLogs := func() string {
+		sep := fmt.Sprintf("\n%s\n", strings.Repeat("=", 100))
+		return fmt.Sprintf("Task Group: %s\n\n%s", t.Name, strings.Join(logArray, sep))
+	}
 
 	for _, sg := range t.StepGroups {
-		sg.SetImage(t.Image)
-
 		logs, err := sg.ExecuteTasks(t.ctx, t.sem)
 		if err != nil {
-			t.RunLog = strings.Join(logArray, sep)
-			return err
+			return formatLogs(), err
 		}
 		logArray = append(logArray, logs)
 	}
 
-	t.RunLog = strings.Join(logArray, sep)
+	return formatLogs(), nil
+}
+
+// Adds StepGroups from the repo.Steps information. Order of execution for the StepGroup
+// is determined by their relative position in the repo's runtime.yaml config file.
+//Tasks in each StepGroup will be executed in parallel.
+func (t *TaskGroup) addStepGroups() error {
+	for _, step := range t.rp.Steps {
+		var groups []*Task
+
+		for _, task := range step.TaskInfoList {
+			t, err := NewTask(
+				task.Name,
+				task.Image,
+				task.Tag,
+				task.Cmd,
+				outputDir(t.JobId),
+				task.WorkDir,
+				task.Env,
+			)
+			if err != nil {
+				return errors.Wrap(err, "invalid task specifications")
+			}
+
+			groups = append(groups, t)
+		}
+
+		sg, err := NewStepGroup(step.Name, groups)
+		if err != nil {
+			return err
+		}
+
+		t.StepGroups = append(t.StepGroups, sg)
+	}
 	return nil
 }
 
 // Updates the repo to the latest version
-func (t *TaskGroup) updateRepo(rp *repo.Repo) error {
-	if err := rp.Clone(); err != nil {
+func (t *TaskGroup) updateRepo() error {
+	if err := t.rp.Clone(); err != nil {
 		return err
 	}
 	return nil
 }
 
 // Check image is updated
-func (t *TaskGroup) updateImage(rp *repo.Repo, uniqueName, commitTag string) error {
-	if libs.IsEmptyOrWhitespace(commitTag) {
-		return errors.New("commit tag cannot be empty")
-	}
-
-	image := fmt.Sprintf("%s:%s", uniqueName, commitTag)
+func (t *TaskGroup) updateImage() error {
+	rp := t.rp
 
 	// check if the image exists, if not clone repo and build image
-	if exists, err := repo.ImageExists(image); err != nil {
+	if exists, err := repo.ImageExists(rp.Image); err != nil {
 		return err
-	} else if !exists {
-		if logs, err := rp.BuildImage(); err != nil {
-			return err
-		} else {
-			t.BuildLog = logs
-		}
+	} else if exists {
+		return nil
 	}
 
-	t.Image = image
+	// build image since it does not exist
+	logs, err := rp.BuildImage()
+	if err != nil {
+		return err
+	}
+	logs = fmt.Sprintf("Building image for task group: %s\n\n%s", t.Name, logs)
+	return writeBuildLogs(rp.Image, logs)
+}
+
+func (t *TaskGroup) pullImage() error {
+	rp := t.rp
+
+	hasImage, err := rp.HasImage()
+	if err != nil {
+		return err
+	} else if !hasImage {
+		logs, err := rp.PullImage()
+		if err != nil {
+			return err
+		}
+		logs = fmt.Sprintf("Pulling image for task group: %s\n\n%s", t.Name, logs)
+		return writeBuildLogs(rp.Image, logs)
+	}
+
+	return nil
+}
+
+func writeBuildLogs(image, logs string) error {
+	file, err := os.OpenFile(imageLogPath(image), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		return err
+	}
+
+	logOutput(file, logs)
 	return nil
 }

@@ -96,14 +96,3 @@ func (t *rTask) newTask(repoName, stepName, image, repoDir string, stepEnv map[s
 
 	return task
 }
-
-// Adds any environment variable to all tasks in repo steps. This variables will take priority
-func (r *Repo) AddEnvVars(env map[string]string) {
-	for _, sg := range r.Steps {
-		for _, task := range sg.TaskInfoList {
-			for k, v := range env {
-				task.Env[k] = v
-			}
-		}
-	}
-}

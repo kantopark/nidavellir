@@ -18,7 +18,7 @@ import (
 
 type StepGroup struct {
 	Name  string
-	tasks []*Task
+	Tasks []*Task
 	sep   string
 	dur   time.Duration
 }
@@ -31,7 +31,7 @@ func NewStepGroup(name string, tasks []*Task) (*StepGroup, error) {
 
 	sg := &StepGroup{
 		Name:  strings.TrimSpace(name),
-		tasks: tasks,
+		Tasks: tasks,
 		sep:   fmt.Sprintf("\n\n%s\n\n", strings.Repeat("-", 100)),
 		dur:   conf.Run.MaxDuration,
 	}
@@ -45,7 +45,7 @@ func NewStepGroup(name string, tasks []*Task) (*StepGroup, error) {
 // Executes all tasks within step group in parallel subject to the semaphore weights
 func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (string, error) {
 	var errs error
-	errCh := make(chan error, len(s.tasks))
+	errCh := make(chan error, len(s.Tasks))
 	done := make(chan bool, 1)
 	ls := NewLogSlice()
 
@@ -54,7 +54,7 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 
 	// for each task in step, acquire a semaphore and execute task. Once task is complete,
 	// release the semaphore and reduce wait group count
-	for _, task := range s.tasks {
+	for _, task := range s.Tasks {
 		if err := sem.Acquire(ctx, 1); err != nil {
 			errCh <- errors.Wrap(err, "could not acquire semaphore lock to execute tasks")
 			continue
@@ -122,12 +122,12 @@ func (s *StepGroup) Validate() error {
 		errs = multierror.Append(errs, errors.New("name cannot be empty"))
 	}
 
-	if len(s.tasks) == 0 {
+	if len(s.Tasks) == 0 {
 		errs = multierror.Append(errs, errors.New("StepGroup has no tasks"))
 	}
 
-	taskNameMap := make(map[string]int, len(s.tasks))
-	for i, task := range s.tasks {
+	taskNameMap := make(map[string]int, len(s.Tasks))
+	for i, task := range s.Tasks {
 		if j, exists := taskNameMap[task.TaskTag]; exists {
 			errs = multierror.Append(errs, errors.Errorf("task %d and task %d has repeated tag name '%s'", i, j, task.TaskTag))
 		} else {
