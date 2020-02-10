@@ -15,15 +15,12 @@ import (
 	. "nidavellir/services/scheduler"
 )
 
+// Using the PythonRepo, tests that tasks are executed correctly
 func TestStepGroup_ExecuteTasks(t *testing.T) {
 	assert := require.New(t)
-	repo := pythonRepo
-
-	step := repo.Steps[0]
-	assert.NotNil(step)
 
 	jobId := uniqueJobId()
-	sg, err := formTestStepGroup(step, jobId)
+	sg, err := FormTestStepGroup(pythonRepo, jobId)
 	assert.NoError(err)
 
 	// test both sequential and parallel runs, when i == 1, StepGroup runs sequentially
@@ -42,11 +39,9 @@ func TestStepGroup_ExecuteTasks(t *testing.T) {
 	}
 }
 
+// Using the longOpsRepo, test that long running tasks are cancelled as they are overtime
 func TestStepGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
 	assert := require.New(t)
-	repo := longOpsRepo
-	step := repo.Steps[0]
-	assert.NotNil(step)
 
 	tests := []struct {
 		Duration time.Duration
@@ -65,7 +60,7 @@ func TestStepGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
 		viper.Set("run.max-duration", test.Duration)
 
 		jobId := uniqueJobId()
-		sg, err := formTestStepGroup(step, jobId)
+		sg, err := FormTestStepGroup(longOpsRepo, jobId)
 		assert.NoError(err)
 
 		ctx := context.Background()
@@ -80,10 +75,12 @@ func TestStepGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
 	}
 }
 
-func formTestStepGroup(step *rp.Step, jobId int) (*StepGroup, error) {
+// Creates a mock StepGroup. This StepGroup will be formed with the first step from the
+// repo's Steps
+func FormTestStepGroup(repo *rp.Repo, jobId int) (*StepGroup, error) {
 	var tasks []*Task
 
-	for _, ti := range step.TaskInfoList {
+	for _, ti := range repo.Steps[0].TaskInfoList {
 		outputDir, err := outputDir(jobId)
 		if err != nil {
 			return nil, err
@@ -104,5 +101,5 @@ func formTestStepGroup(step *rp.Step, jobId int) (*StepGroup, error) {
 		tasks = append(tasks, task)
 	}
 
-	return NewStepGroup(step.Name, tasks)
+	return NewStepGroup(repo.Steps[0].Name, tasks)
 }

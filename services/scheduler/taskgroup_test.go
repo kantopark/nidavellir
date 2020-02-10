@@ -16,7 +16,6 @@ import (
 // Repo environment variable can be seen from the runtime config in
 // https://github.com/kantopark/python-test-repo/blob/master/runtime.yaml
 func TestTaskGroup_TaskEnvVarProcessedCorrectly(t *testing.T) {
-	t.Parallel()
 	assert := require.New(t)
 	jobId := uniqueJobId()
 
@@ -53,7 +52,6 @@ func TestTaskGroup_TaskEnvVarProcessedCorrectly(t *testing.T) {
 }
 
 func TestTaskGroup_AddEnvVar(t *testing.T) {
-	t.Parallel()
 	assert := require.New(t)
 	jobId := uniqueJobId()
 
@@ -100,11 +98,10 @@ func TestTaskGroup_AddEnvVar(t *testing.T) {
 }
 
 func TestTaskGroup_Execute(t *testing.T) {
-	t.Parallel()
 	assert := require.New(t)
 
 	jobId := uniqueJobId()
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	tg, err := NewTaskGroup(pythonRepo, ctx, 0, jobId, time.Now())
