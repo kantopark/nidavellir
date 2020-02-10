@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhui/dktest"
 	"github.com/stretchr/testify/require"
 
 	. "nidavellir/services/scheduler"
@@ -17,11 +18,9 @@ import (
 func TestTaskGroup_TaskEnvVarProcessedCorrectly(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
-	repo := pythonRepo
-	ctx := context.Background()
 	jobId := uniqueJobId()
 
-	tg, err := NewTaskGroup(repo, ctx, 0, jobId, time.Now())
+	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now())
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -56,11 +55,9 @@ func TestTaskGroup_TaskEnvVarProcessedCorrectly(t *testing.T) {
 func TestTaskGroup_AddEnvVar(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
-	repo := pythonRepo
-	ctx := context.Background()
 	jobId := uniqueJobId()
 
-	tg, err := NewTaskGroup(repo, ctx, 0, jobId, time.Now())
+	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now())
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -100,4 +97,36 @@ func TestTaskGroup_AddEnvVar(t *testing.T) {
 		"key2":   "key2",
 		"key3":   "key3",
 	}))
+}
+
+func TestTaskGroup_Execute(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+
+	jobId := uniqueJobId()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	tg, err := NewTaskGroup(pythonRepo, ctx, 0, jobId, time.Now())
+	assert.NoError(err)
+	assert.Len(tg.StepGroups, 3)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		_, port, err := info.FirstPort()
+		assert.NoError(err)
+
+		envs := make(map[string]string)
+		for key, value := range postgresEnv {
+			envs[key] = value
+		}
+		envs["POSTGRES_HOST"] = "172.17.0.1"
+		envs["POSTGRES_PORT"] = port
+
+		tg.AddEnvVar(envs)
+
+		logs, err := tg.Execute()
+		assert.NoError(err)
+		assert.NotEmpty(logs)
+		assert.True(tg.Completed)
+	})
 }

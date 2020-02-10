@@ -23,6 +23,7 @@ type TaskGroup struct {
 	SourceId   int
 	JobId      int
 	TaskDate   string
+	Completed  bool
 }
 
 func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time) (*TaskGroup, error) {
@@ -35,6 +36,7 @@ func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskD
 		SourceId:   sourceId,
 		JobId:      jobId,
 		TaskDate:   taskDate.Format("2006-01-02 15:04:05"),
+		Completed:  false,
 	}
 
 	if err := tg.updateRepo(); err != nil {
@@ -86,6 +88,7 @@ func (t *TaskGroup) Execute() (string, error) {
 		}
 		logArray = append(logArray, logs)
 	}
+	t.Completed = true
 
 	return formatLogs(), nil
 }

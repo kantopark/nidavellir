@@ -10,7 +10,7 @@ setup:
   # The image that is used to run the task. If it does not exist in the local
   # image repository, will attempt to pull it. If provided, the user should
   # ideally provide the tags as well to "version control" it
-  image: danielbok/python-nida:3.7.5
+  image: danielbok/python-nida:3.7.6
 
 # global environment variables
 environment:

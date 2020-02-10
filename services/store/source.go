@@ -17,14 +17,15 @@ const (
 )
 
 type Source struct {
-	Id         int       `json:"id"`
-	Name       string    `json:"name"`
-	UniqueName string    `json:"-"`
-	RepoUrl    string    `json:"repo_url"`
-	Interval   int       `json:"interval"`
-	State      string    `json:"state"`
-	NextTime   time.Time `json:"next_time"`
-	Secrets    []Secret  `json:"secrets"`
+	Id         int    `json:"id"`
+	Name       string `json:"name"`
+	UniqueName string `json:"-"`
+	RepoUrl    string `json:"repo_url"`
+	// time interval between job and next job in seconds
+	Interval int       `json:"interval"`
+	State    string    `json:"state"`
+	NextTime time.Time `json:"next_time"`
+	Secrets  []Secret  `json:"secrets"`
 }
 
 func NewSource(name, repoUrl string, startTime time.Time, interval int) (*Source, error) {
