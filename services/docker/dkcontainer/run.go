@@ -3,6 +3,7 @@ package dkcontainer
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -39,6 +40,11 @@ func (o *RunOptions) imageTag() (string, error) {
 	if o.Tag == "" {
 		return o.Image, nil
 	}
+
+	if len(regexp.MustCompile(`\s`).Split(o.Name, -1)) > 1 {
+		return "", errors.Errorf("Invalid container tag name '%s'", o.Name)
+	}
+
 	return fmt.Sprintf("%s:%s", o.Image, o.Tag), nil
 }
 
