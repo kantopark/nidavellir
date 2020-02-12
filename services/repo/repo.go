@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -165,14 +166,14 @@ func (r *Repo) gitUrl() string {
 }
 
 func (r *Repo) needsToUpdate() (bool, error) {
-	cmd := exec.Command("git", "ls-remote", "origin", "master", "|", "awk", "{ print $1 }")
+	cmd := exec.Command("git", "ls-remote", "origin", "master")
 	cmd.Dir = r.WorkDir
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return false, errors.Wrap(err, "could not fetch data from remote")
 	}
-	remoteHash := string(bytes.TrimSpace(output))
+	remoteHash := string(regexp.MustCompile(`([\S]+)`).Find(bytes.TrimSpace(output)))
 
 	cmd = exec.Command("git", "rev-parse", "master")
 	cmd.Dir = r.WorkDir
