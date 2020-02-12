@@ -35,18 +35,14 @@ func NewJobManager(db IStore) *JobManager {
 }
 
 // Starts watching for jobs and executing work
-func (m *JobManager) Start() error {
+func (m *JobManager) Start() {
 	if !m.started {
 		ctx, cancel := context.WithCancel(context.Background())
 		m.started = true
 		m.ctx = ctx
 		m.cancel = cancel
 		go m.dispatchWork()
-
-		return nil
 	}
-
-	return errors.New("cannot start JobManager as it is already running")
 }
 
 // Stops all job and the job manager.

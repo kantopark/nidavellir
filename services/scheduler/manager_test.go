@@ -91,12 +91,7 @@ func TestNewJobManager(t *testing.T) {
 	assert := require.New(t)
 	db := newMockStore()
 	manager := NewJobManager(db)
-
-	err := manager.Start()
-	assert.NoError(err)
-
-	err = manager.Start() // should have error when starting again
-	assert.Error(err)
+	manager.Start()
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		_, port, err := info.FirstPort()
