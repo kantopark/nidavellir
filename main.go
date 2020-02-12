@@ -18,7 +18,8 @@ func main() {
 	}
 
 	systemCheck()
-	dbOption := startDb()
+	dbOption, cleanUp := startDb()
+	defer cleanUp()
 
 	db, err := store.New(dbOption)
 	if err != nil {

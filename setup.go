@@ -28,22 +28,29 @@ func systemCheck() {
 	}
 }
 
-func startDb() *store.DbOption {
+func startDb() (option *store.DbOption, cleanUp func()) {
 	name := "nida-db"
-	option := &store.DbOption{
+	port := 8432
+	option = &store.DbOption{
 		Host:     "localhost",
-		Port:     8432,
+		Port:     port,
 		User:     "user",
 		Password: "password",
 		DbName:   "db",
 	}
-
-	if logs, err := container.Stop(&container.StopOptions{Name: name, Port: option.Port}); err != nil {
-		log.Fatalln(err)
-	} else {
-		log.Println(fmt.Sprintf("Stopped container: %s", strings.TrimSpace(logs)))
+	// cleans up DB by stopping it
+	cleanUp = func() {
+		logs, err := container.Stop(&container.StopOptions{Name: name, Port: port, IgnoreNotFoundError: true})
+		if err != nil {
+			log.Fatalln(err)
+		} else {
+			if len(logs) > 0 {
+				log.Println(fmt.Sprintf("Stopped database container: %s", strings.TrimSpace(logs)))
+			}
+		}
 	}
 
+	cleanUp()
 	if logs, err := container.Run(&container.RunOptions{
 		Image: "postgres",
 		Tag:   "12-alpine",
@@ -53,7 +60,7 @@ func startDb() *store.DbOption {
 			"POSTGRES_PASSWORD": "password",
 			"POSTGRES_DB":       "db",
 		},
-		Ports: map[int]int{option.Port: 5432},
+		Ports: map[int]int{port: 5432},
 		Volumes: map[string]string{
 			name: "/var/lib/postgresql/data",
 		},
@@ -64,5 +71,5 @@ func startDb() *store.DbOption {
 		log.Println(fmt.Sprintf("Started postgres database container: %s", strings.TrimSpace(logs)))
 	}
 
-	return option
+	return option, cleanUp
 }
