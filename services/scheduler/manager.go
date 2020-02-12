@@ -3,41 +3,58 @@ package scheduler
 import (
 	"context"
 	"os"
-	"sync/atomic"
+	"regexp"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"nidavellir/config"
 	rp "nidavellir/services/repo"
 	"nidavellir/services/store"
 )
 
 type JobManager struct {
-	conf  *config.Config
-	ctx   context.Context
-	db    IStore
-	queue *JobQueue
+	ctx     context.Context
+	cancel  context.CancelFunc
+	db      IStore
+	queue   *JobQueue
+	started bool
+	// An array of completed jobs by the manager, this is primarily used for testing purposes
+	CompletedJobs []int
 }
 
 // The manager holds a queue of job. Whenever there are new jobs, it will dispatch
 // the job. At any one time, it can only run one job. Thus the jobs are queued.
-func NewJobManager(ctx context.Context) (*JobManager, error) {
-	conf, err := config.New()
-	if err != nil {
-		return nil, err
+func NewJobManager(db IStore) *JobManager {
+	return &JobManager{
+		queue:         NewTaskQueue(),
+		db:            db,
+		started:       false,
+		CompletedJobs: []int{},
+	}
+}
+
+// Starts watching for jobs and executing work
+func (m *JobManager) Start() error {
+	if !m.started {
+		ctx, cancel := context.WithCancel(context.Background())
+		m.started = true
+		m.ctx = ctx
+		m.cancel = cancel
+		go m.dispatchWork()
+
+		return nil
 	}
 
-	m := &JobManager{
-		conf:  conf,
-		ctx:   ctx,
-		queue: NewTaskQueue(),
+	return errors.New("cannot start JobManager as it is already running")
+}
+
+// Stops all job and the job manager.
+func (m *JobManager) Close() {
+	if m.started {
+		m.started = false
+		m.cancel()
 	}
-
-	go m.dispatchWork()
-
-	return m, nil
 }
 
 // Adds a job into the manager queue. Jobs are saved as TaskGroups in the
@@ -53,114 +70,86 @@ func (m *JobManager) AddJob(source *store.Source, trigger string) error {
 		return err
 	}
 
-	tg, err := NewTaskGroup(m.ctx, source.Id, job.Id, source.Name, source.RepoUrl, source.UniqueName, repo.Commit, source.NextTime)
+	tg, err := NewTaskGroup(repo, m.ctx, source.Id, job.Id, source.NextTime)
 	if err != nil {
 		return err
 	}
 
-	if tg.BuildLog != "" {
-		file, err := os.OpenFile(imageLogPath(tg.Image), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-		if err != nil {
-			return err
-		}
-		logOutput(file, tg.BuildLog)
-	}
-
-	extraEnvVar := source.SecretMap()
-	extraEnvVar["task_date"] = source.NextTime.Format("2006-01-02 15:04:05")
-	repo.AddEnvVars(extraEnvVar)
-
-	for _, step := range repo.Steps {
-		var groups []*Task
-
-		for _, task := range step.Tasks {
-			t, err := NewTask(
-				task.Name,
-				task.Image,
-				task.Tag,
-				task.Cmd,
-				outputDir(job.Id),
-				task.WorkDir,
-				task.Env,
-			)
-			if err != nil {
-				return errors.Wrap(err, "invalid task specifications")
-			}
-
-			groups = append(groups, t)
-		}
-
-		tg.AddTasks(groups)
-	}
+	extraEnv := source.SecretMap()
+	extraEnv["task_date"] = source.NextTime.Format("2006-01-02 15:04:05")
+	tg.AddEnvVar(extraEnv)
 
 	m.queue.Enqueue(tg)
 	return nil
 }
 
+// starts dispatching work
 func (m *JobManager) dispatchWork() {
-	var count int64
-	count = 0
+	ch := make(chan bool, 1)
 	ticker := time.NewTicker(5 * time.Second)
-
-	dispatch := func() {
-		taskGroup := m.queue.Dequeue()
-		if taskGroup == nil {
-			return
-		}
-		file, err := os.OpenFile(logFilePath(taskGroup.Name, taskGroup.TaskDate), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-		if err != nil {
-			log.Println(errors.Wrap(err, "could not open log file"))
-			return
-		}
-		defer func() { _ = file.Close() }()
-
-		source, job, err := m.retrieveWorkDetails(taskGroup)
-		if err != nil {
-			logOutput(file, err)
-			return
-		}
-
-		if err := m.initWork(source, job); err != nil {
-			logOutput(file, err)
-			return
-		}
-
-		// Execute tasks and save logs if any
-		if err := taskGroup.Execute(); err != nil {
-			if taskGroup.BuildLog != "" {
-				logOutput(file, taskGroup.BuildLog)
-			}
-			logOutput(file, err)
-
-			if _ = m.failWork(source, job); err != nil {
-				log.Println(err)
-			}
-		} else {
-			if taskGroup.BuildLog != "" {
-				logOutput(file, taskGroup.BuildLog)
-			}
-
-			if err := m.completeWork(source, job); err != nil {
-				log.Println(err)
-			}
-		}
-	}
 
 	for {
 		select {
 		case <-ticker.C:
-			if count == 0 && m.queue.HasJob() {
-				atomic.AddInt64(&count, 1)
-				dispatch()
-				atomic.AddInt64(&count, -1)
+			if len(ch) == 0 && m.queue.HasJob() {
+				ch <- true
+				go m.dispatch(m.queue.Dequeue(), ch)
+			}
+		case <-ch:
+			if m.queue.HasJob() {
+				ch <- true
+				go m.dispatch(m.queue.Dequeue(), ch)
 			}
 		case <-m.ctx.Done():
 			return
 		}
 	}
-
 }
 
+// Executes the TaskGroup
+func (m *JobManager) dispatch(taskGroup *TaskGroup, done <-chan bool) {
+	defer func() { <-done }()
+
+	if taskGroup == nil {
+		return
+	}
+	taskDate := regexp.MustCompile(`\D`).ReplaceAllString(taskGroup.TaskDate, "-")
+	file, err := os.OpenFile(logFilePath(taskGroup.Name, taskDate), os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		log.Println(errors.Wrap(err, "could not open log file"))
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	source, job, err := m.retrieveWorkDetails(taskGroup)
+	if err != nil {
+		logOutput(file, err)
+		return
+	}
+
+	err = m.initWork(source, job)
+	if err != nil {
+		logOutput(file, err)
+		return
+	}
+
+	// Execute tasks and save logs if any
+	logs, err := taskGroup.Execute()
+	if err != nil {
+		_ = m.failWork(source, job)
+		logOutput(file, err)
+
+		return
+	}
+
+	if err := m.completeWork(source, job); err != nil {
+		logOutput(file, err)
+	}
+	logOutput(file, logs)
+	m.CompletedJobs = append(m.CompletedJobs, job.Id)
+}
+
+// Fetches details about the job from the database
 func (m *JobManager) retrieveWorkDetails(tg *TaskGroup) (*store.Source, *store.Job, error) {
 	source, err := m.db.GetSource(tg.SourceId)
 	if err != nil {
@@ -175,24 +164,7 @@ func (m *JobManager) retrieveWorkDetails(tg *TaskGroup) (*store.Source, *store.J
 	return source, job, nil
 }
 
-func (m *JobManager) initWork(source *store.Source, job *store.Job) error {
-	source.ToRunning()
-	if err := job.ToStartState(); err != nil {
-		return err
-	}
-
-	return m.updateJobAndSourceStatus(source, job)
-}
-
-func (m *JobManager) failWork(source *store.Source, job *store.Job) error {
-	source.ToCompleted()
-	if err := job.ToFailureState(); err != nil {
-		return err
-	}
-
-	return m.updateJobAndSourceStatus(source, job)
-}
-
+// Announces that the job is completed
 func (m *JobManager) completeWork(source *store.Source, job *store.Job) error {
 	source.ToCompleted()
 	if err := job.ToSuccessState(); err != nil {
@@ -203,6 +175,27 @@ func (m *JobManager) completeWork(source *store.Source, job *store.Job) error {
 
 }
 
+// Initializes the work
+func (m *JobManager) initWork(source *store.Source, job *store.Job) error {
+	source.ToRunning()
+	if err := job.ToStartState(); err != nil {
+		return err
+	}
+
+	return m.updateJobAndSourceStatus(source, job)
+}
+
+// Announces that the job has failed
+func (m *JobManager) failWork(source *store.Source, job *store.Job) error {
+	source.ToCompleted()
+	if err := job.ToFailureState(); err != nil {
+		return err
+	}
+
+	return m.updateJobAndSourceStatus(source, job)
+}
+
+// Updates the job status
 func (m *JobManager) updateJobAndSourceStatus(source *store.Source, job *store.Job) error {
 	if _, err := m.db.UpdateJob(*job); err != nil {
 		return errors.Wrap(err, "could not update job status")
@@ -213,18 +206,4 @@ func (m *JobManager) updateJobAndSourceStatus(source *store.Source, job *store.J
 	}
 
 	return nil
-}
-
-func taskEnvVar(secrets, runtimeEnvs, taskEnvs map[string]string, taskDate time.Time) map[string]string {
-	envs := make(map[string]string)
-
-	for _, envMap := range []map[string]string{secrets, runtimeEnvs, taskEnvs} {
-		for key, value := range envMap {
-			envs[key] = value
-		}
-	}
-
-	envs["task_date"] = taskDate.Format("2006-01-02 15:04:05")
-
-	return envs
 }
