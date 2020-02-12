@@ -116,7 +116,7 @@ func (t *TaskGroup) addStepGroups() error {
 			t, err := NewTask(
 				task.Name,
 				task.Image,
-				task.Tag,
+				fmt.Sprintf("%s_%d", task.Tag, t.JobId),
 				task.Cmd,
 				outputDir(t.JobId),
 				task.WorkDir,
