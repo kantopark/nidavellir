@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"testing"
-	"time"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/semaphore"
 
@@ -36,42 +34,6 @@ func TestStepGroup_ExecuteTasks(t *testing.T) {
 		files, err := ioutil.ReadDir(dir)
 		assert.NoError(err)
 		assert.Len(files, 2) // for this particular repo, should have 2 files
-	}
-}
-
-// Using the longOpsRepo, test that long running tasks are cancelled as they are overtime
-func TestStepGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
-	assert := require.New(t)
-
-	tests := []struct {
-		Duration time.Duration
-		HasError bool
-	}{
-		{2 * time.Second, true},
-		{10 * time.Second, false},
-	}
-
-	dur := viper.GetDuration("run.max-duration")
-	defer func() {
-		viper.Set("run.max-duration", dur)
-	}()
-
-	for _, test := range tests {
-		viper.Set("run.max-duration", test.Duration)
-
-		jobId := uniqueJobId()
-		sg, err := FormTestStepGroup(longOpsRepo, jobId)
-		assert.NoError(err)
-
-		ctx := context.Background()
-		sem := semaphore.NewWeighted(2)
-		logs, err := sg.ExecuteTasks(ctx, sem)
-		if test.HasError {
-			assert.Error(err)
-		} else {
-			assert.NoError(err)
-			assert.NotEmpty(logs)
-		}
 	}
 }
 

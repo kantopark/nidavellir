@@ -101,10 +101,7 @@ func TestTaskGroup_Execute(t *testing.T) {
 	assert := require.New(t)
 
 	jobId := uniqueJobId()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	tg, err := NewTaskGroup(pythonRepo, ctx, 0, jobId, time.Now())
+	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now())
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -119,11 +116,38 @@ func TestTaskGroup_Execute(t *testing.T) {
 		envs["POSTGRES_HOST"] = "172.17.0.1"
 		envs["POSTGRES_PORT"] = port
 
-		tg.AddEnvVar(envs)
+		tg.AddEnvVar(envs).SetMaxDuration(5 * time.Minute)
 
 		logs, err := tg.Execute()
 		assert.NoError(err)
 		assert.NotEmpty(logs)
 		assert.True(tg.Completed)
 	})
+}
+
+func TestTaskGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
+	assert := require.New(t)
+
+	tests := []struct {
+		Duration time.Duration
+		HasError bool
+	}{
+		{2 * time.Second, true}, // max duration only 2 seconds, thus errors
+		{10 * time.Second, false},
+	}
+
+	for _, test := range tests {
+		jobId := uniqueJobId()
+		tg, err := NewTaskGroup(longOpsRepo, context.Background(), 0, jobId, time.Now())
+		assert.NoError(err)
+
+		tg.SetMaxDuration(test.Duration)
+		logs, err := tg.Execute()
+		if test.HasError {
+			assert.Error(err)
+		} else {
+			assert.NoError(err)
+			assert.NotEmpty(logs)
+		}
+	}
 }

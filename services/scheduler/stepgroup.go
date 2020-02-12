@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 
-	"nidavellir/config"
 	"nidavellir/libs"
 )
 
@@ -20,20 +17,13 @@ type StepGroup struct {
 	Name  string
 	Tasks []*Task
 	sep   string
-	dur   time.Duration
 }
 
 func NewStepGroup(name string, tasks []*Task) (*StepGroup, error) {
-	conf, err := config.New()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not create StepGroup")
-	}
-
 	sg := &StepGroup{
 		Name:  strings.TrimSpace(name),
 		Tasks: tasks,
 		sep:   fmt.Sprintf("\n\n%s\n\n", strings.Repeat("-", 100)),
-		dur:   conf.Run.MaxDuration,
 	}
 
 	if err := sg.Validate(); err != nil {
@@ -87,14 +77,6 @@ func runTask(sem *semaphore.Weighted, wg *sync.WaitGroup, ctx context.Context, t
 	defer sem.Release(1)
 	defer wg.Done()
 	logCh := make(chan string)
-
-	conf, err := config.New()
-	if err != nil {
-		log.Fatal(errors.Wrap(err, "could not execute tasks as config cannot be read"))
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, conf.Run.MaxDuration)
-	defer cancel() // this function is called when task executes finishes early and will release resources
 
 	go func() {
 		if logs, err := task.Execute(); err != nil {

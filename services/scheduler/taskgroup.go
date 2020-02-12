@@ -24,6 +24,7 @@ type TaskGroup struct {
 	JobId      int
 	TaskDate   string
 	Completed  bool
+	Duration   time.Duration
 }
 
 func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time) (*TaskGroup, error) {
@@ -37,6 +38,7 @@ func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskD
 		JobId:      jobId,
 		TaskDate:   taskDate.Format("2006-01-02 15:04:05"),
 		Completed:  false,
+		Duration:   1 * time.Hour, // default duration is 1 hour
 	}
 
 	if err := tg.updateRepo(); err != nil {
@@ -63,7 +65,7 @@ func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskD
 }
 
 // Adds any environment variable to all tasks in the TaskGroup. These variables will have higher priority
-func (t *TaskGroup) AddEnvVar(env map[string]string) {
+func (t *TaskGroup) AddEnvVar(env map[string]string) *TaskGroup {
 	for _, sg := range t.StepGroups {
 		for _, task := range sg.Tasks {
 			for k, v := range env {
@@ -71,6 +73,13 @@ func (t *TaskGroup) AddEnvVar(env map[string]string) {
 			}
 		}
 	}
+	return t
+}
+
+// Sets the maximum job duration.
+func (t *TaskGroup) SetMaxDuration(duration time.Duration) *TaskGroup {
+	t.Duration = duration
+	return t
 }
 
 func (t *TaskGroup) Execute() (string, error) {
@@ -81,8 +90,11 @@ func (t *TaskGroup) Execute() (string, error) {
 		return fmt.Sprintf("Task Group: %s\n\n%s", t.Name, strings.Join(logArray, sep))
 	}
 
+	ctx, cancel := context.WithTimeout(t.ctx, t.Duration)
+	defer cancel()
+
 	for _, sg := range t.StepGroups {
-		logs, err := sg.ExecuteTasks(t.ctx, t.sem)
+		logs, err := sg.ExecuteTasks(ctx, t.sem)
 		if err != nil {
 			return formatLogs(), err
 		}
