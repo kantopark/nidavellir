@@ -18,6 +18,7 @@ type appConfig struct {
 		KeyFile  string `mapstructure:"keyfile"`
 		CertFile string `mapstructure:"certfile"`
 	} `mapstructure:"tls"`
+	Port int `mapstructure:"port"`
 }
 
 func (a *appConfig) Validate() error {

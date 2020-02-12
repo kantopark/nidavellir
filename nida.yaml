@@ -7,6 +7,14 @@ admin:
 app:
   # working directory, leave this empty to use the default working directory
   workdir: ""
+  # Both keyfile and certfile file must be specified for TLS to work
+  tls:
+    # path to the private key. Leave empty if not using TLS
+    keyfile: ""
+    # path to the public key. Leave empty if not using TLS
+    certfile: ""
+  # port that the server app runs on
+  port: 8000
 
 # container run and build configuration
 run:
