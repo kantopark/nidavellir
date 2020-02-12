@@ -14,6 +14,10 @@ import (
 
 type appConfig struct {
 	WorkDir string `mapstructure:"workdir"`
+	TLS     struct {
+		KeyFile  string `mapstructure:"keyfile"`
+		CertFile string `mapstructure:"certfile"`
+	} `mapstructure:"tls"`
 }
 
 func (a *appConfig) Validate() error {
@@ -72,4 +76,18 @@ func (a *appConfig) createFolder(group, name string) string {
 	}
 
 	return dir
+}
+
+// Checks if the application has TLS certificates
+func (a *appConfig) HasCerts() bool {
+	exists := func(filepath string) bool {
+		filepath = strings.TrimSpace(filepath)
+		if _, err := os.Stat(filepath); os.IsNotExist(err) {
+			return false
+		}
+
+		return true
+	}
+
+	return exists(a.TLS.CertFile) && exists(a.TLS.KeyFile)
 }

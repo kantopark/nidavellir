@@ -15,7 +15,7 @@ type Config struct {
 	Run   runConfig   `mapstructure:"run"`
 }
 
-type iValidate interface {
+type IValidate interface {
 	Validate() error
 }
 
@@ -38,7 +38,7 @@ func New() (*Config, error) {
 		return nil, errors.Wrap(err, "could not unmarshal config")
 	}
 
-	for _, t := range []iValidate{
+	for _, t := range []IValidate{
 		&config.Admin,
 		&config.App,
 		&config.Run,
@@ -78,8 +78,4 @@ func setConfigDirectory() error {
 	viper.AddConfigPath(workDir)
 
 	return nil
-}
-
-func validate(t iValidate) error {
-	return t.Validate()
 }
