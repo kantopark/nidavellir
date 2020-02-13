@@ -45,6 +45,7 @@ func NewSourceHandler() *SourceHandler {
 }
 
 func TestSourceHandler_GetSources(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 	handler := NewSourceHandler()
 
@@ -60,6 +61,7 @@ func TestSourceHandler_GetSources(t *testing.T) {
 }
 
 func TestSourceHandler_GetSource(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 	handler := NewSourceHandler()
 
@@ -92,6 +94,7 @@ func TestSourceHandler_GetSource(t *testing.T) {
 }
 
 func TestSourceHandler_CreateSource(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 	handler := NewSourceHandler()
 
@@ -119,6 +122,7 @@ func TestSourceHandler_CreateSource(t *testing.T) {
 }
 
 func TestSourceHandler_CreateSource_WithFaultyJsonReturnsError(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 	handler := NewSourceHandler()
 
@@ -137,6 +141,7 @@ func TestSourceHandler_CreateSource_WithFaultyJsonReturnsError(t *testing.T) {
 
 // Tests errors out as id should not be specified
 func TestSourceHandler_CreateSource_WithInvalidKeyReturnsError(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 	handler := NewSourceHandler()
 
@@ -153,6 +158,7 @@ func TestSourceHandler_CreateSource_WithInvalidKeyReturnsError(t *testing.T) {
 }
 
 func TestSourceHandler_UpdateSource(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 	handler := NewSourceHandler()
 
@@ -197,6 +203,7 @@ func TestSourceHandler_UpdateSource(t *testing.T) {
 }
 
 func TestSourceHandler_DeleteSource(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 	handler := NewSourceHandler()
 
@@ -217,4 +224,80 @@ func TestSourceHandler_DeleteSource(t *testing.T) {
 		assert.Equal(test.StatusCode, w.Code)
 	}
 
+}
+
+func TestSourceHandler_AddSecret(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+	handler := NewSourceHandler()
+
+	w := httptest.NewRecorder()
+	r := NewTestRequest("POST", "/", strings.NewReader(`{
+"source_id": 1,
+"key": "NewKey",
+"value": "NewValue"
+}`), map[string]string{"sourceId": "1"})
+
+	handler.AddSecret()(w, r)
+	assert.Equal(http.StatusOK, w.Code)
+
+	var secret *store.Secret
+	err := readJson(w, &secret)
+	assert.NoError(err)
+	assert.IsType(&store.Secret{}, secret)
+}
+
+func TestSourceHandler_GetSecrets(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+	handler := NewSourceHandler()
+
+	w := httptest.NewRecorder()
+	r := NewTestRequest("GET", "/", nil, map[string]string{"sourceId": "1"})
+
+	handler.GetSecrets()(w, r)
+	assert.Equal(http.StatusOK, w.Code)
+
+	var secrets []*store.Secret
+	err := readJson(w, &secrets)
+	assert.NoError(err)
+	assert.IsType([]*store.Secret{}, secrets)
+	assert.Len(secrets, 2)
+}
+
+func TestSourceHandler_UpdateSecret(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+	handler := NewSourceHandler()
+
+	w := httptest.NewRecorder()
+	r := NewTestRequest("PUT", "/", strings.NewReader(`{
+"id": 1,
+"source_id": 1,
+"key": "NewKey",
+"value": "NewValue"
+}`), map[string]string{"sourceId": "1"})
+
+	handler.AddSecret()(w, r)
+	assert.Equal(http.StatusOK, w.Code)
+
+	var secret *store.Secret
+	err := readJson(w, &secret)
+	assert.NoError(err)
+	assert.IsType(&store.Secret{}, secret)
+	assert.Equal(secret.Key, "NewKey")
+	assert.Equal(secret.Value, "NewValue")
+}
+
+func TestSourceHandler_DeleteSecret(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+	handler := NewSourceHandler()
+
+	w := httptest.NewRecorder()
+	r := NewTestRequest("DELETE", "/", nil, map[string]string{"sourceId": "1", "id": "1"})
+
+	handler.DeleteSecret()(w, r)
+	assert.Equal(http.StatusOK, w.Code)
 }

@@ -20,7 +20,7 @@ func (m *MockSourceStore) AddSource(source store.Source) (*store.Source, error) 
 	return &source, nil
 }
 
-func (m MockSourceStore) GetSource(id int) (*store.Source, error) {
+func (m *MockSourceStore) GetSource(id int) (*store.Source, error) {
 	if source, exist := m.db[id]; !exist {
 		return nil, errors.Errorf("no source with id %d", id)
 	} else {
@@ -50,4 +50,53 @@ func (m *MockSourceStore) RemoveSource(id int) error {
 		return errors.Errorf("id %d does not exists", id)
 	}
 	return nil
+}
+
+func (m *MockSourceStore) GetSecrets(sourceId int) ([]*store.Secret, error) {
+	var secrets []*store.Secret
+	if source, exist := m.db[sourceId]; exist {
+		for _, s := range source.Secrets {
+			secrets = append(secrets, &s)
+		}
+	} else {
+	}
+	return secrets, nil
+}
+
+func (m *MockSourceStore) AddSecret(secret store.Secret) (*store.Secret, error) {
+	source, exist := m.db[secret.SourceId]
+	if !exist {
+		return nil, errors.Errorf("source id '%d' does not exist", secret.SourceId)
+	}
+
+	secret.Id = len(source.Secrets) + 1
+	source.Secrets = append(source.Secrets, secret)
+	return &secret, nil
+}
+
+func (m *MockSourceStore) UpdateSecret(secret store.Secret) (*store.Secret, error) {
+	source, exist := m.db[secret.SourceId]
+	if !exist {
+		return nil, errors.Errorf("source id '%d' does not exist", secret.SourceId)
+	}
+	for i, s := range source.Secrets {
+		if s.Id == secret.Id {
+			source.Secrets[i] = secret
+			return &secret, nil
+		}
+	}
+
+	return nil, errors.Errorf("secret id '%d' does not exist", secret.Id)
+}
+
+func (m *MockSourceStore) RemoveSecret(id int) error {
+	for _, source := range m.db {
+		for i, secret := range source.Secrets {
+			if secret.Id == id {
+				source.Secrets = append(source.Secrets[:i], source.Secrets[i+1:]...)
+				return nil
+			}
+		}
+	}
+	return errors.Errorf("no secret with id '%d' found", id)
 }
