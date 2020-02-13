@@ -25,7 +25,6 @@ func TestNewSource(t *testing.T) {
 		{"Project", "https://git-repo", 30, false},
 		{"123  ", "https://git-repo", 30, true},
 		{"Project", "git-repo", 30, true},
-		{"Project", "http://git-repo", 30, true},
 		{"Project", "https://git-repo", 29, true},
 	}
 

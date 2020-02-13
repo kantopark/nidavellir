@@ -3,14 +3,18 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 
+	"nidavellir/libs"
 	"nidavellir/services/repo"
 )
 
@@ -25,9 +29,16 @@ type TaskGroup struct {
 	TaskDate   string
 	Completed  bool
 	Duration   time.Duration
+	DataFolder string
+	OutputDir  string
 }
 
-func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time) (*TaskGroup, error) {
+func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time, dataFolder string) (*TaskGroup, error) {
+	outputDir, err := GetOutputDir(dataFolder, jobId)
+	if err != nil {
+		return nil, err
+	}
+
 	tg := &TaskGroup{
 		Name:       rp.Name,
 		ctx:        ctx,
@@ -39,6 +50,8 @@ func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskD
 		TaskDate:   taskDate.Format("2006-01-02 15:04:05"),
 		Completed:  false,
 		Duration:   1 * time.Hour, // default duration is 1 hour
+		DataFolder: dataFolder,
+		OutputDir:  outputDir,
 	}
 
 	if err := tg.updateRepo(); err != nil {
@@ -118,7 +131,7 @@ func (t *TaskGroup) addStepGroups() error {
 				task.Image,
 				fmt.Sprintf("%s_%d", task.Tag, t.JobId),
 				task.Cmd,
-				outputDir(t.JobId),
+				t.OutputDir,
 				task.WorkDir,
 				task.Env,
 			)
@@ -164,7 +177,9 @@ func (t *TaskGroup) updateImage() error {
 		return err
 	}
 	logs = fmt.Sprintf("Building image for task group: %s\n\n%s", t.Name, logs)
-	return writeBuildLogs(rp.Image, logs)
+
+	t.logImageOutput(logs)
+	return nil
 }
 
 func (t *TaskGroup) pullImage() error {
@@ -179,18 +194,33 @@ func (t *TaskGroup) pullImage() error {
 			return err
 		}
 		logs = fmt.Sprintf("Pulling image for task group: %s\n\n%s", t.Name, logs)
-		return writeBuildLogs(rp.Image, logs)
+		t.logImageOutput(logs)
 	}
 
 	return nil
 }
 
-func writeBuildLogs(image, logs string) error {
-	file, err := os.OpenFile(imageLogPath(image), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+// saves the image build logs into a file
+func (t *TaskGroup) logImageOutput(logs string) {
+	image, tag := t.rp.ImageTag()
+	logFile, err := NewLogFile(t.DataFolder, "image-logs", image, tag)
 	if err != nil {
-		return err
+		log.Println(errors.Wrap(err, "could not create log file"))
+		return
 	}
+	defer logFile.Close()
 
-	logOutput(file, logs)
-	return nil
+	logFile.AppendContent(logs)
+}
+
+// Creates the folder to store the output from the tasks
+func GetOutputDir(dataFolder string, jobId int) (string, error) {
+	folder := filepath.Join(dataFolder, "output", strconv.Itoa(jobId))
+	if !libs.PathExists(folder) {
+		err := os.MkdirAll(folder, 0777)
+		if err != nil {
+			return folder, err
+		}
+	}
+	return folder, nil
 }

@@ -63,7 +63,7 @@ func (s *rStep) newStepGroup(repoName, image, repoDir string, globalEnv map[stri
 	}
 
 	if len(s.Tasks) == 0 {
-		return nil, errors.Errorf("step '%s' has no tasks")
+		return nil, errors.Errorf("step '%s' has no tasks", s.Name)
 	}
 
 	for _, t := range s.Tasks {

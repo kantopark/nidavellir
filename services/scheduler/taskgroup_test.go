@@ -19,7 +19,7 @@ func TestTaskGroup_TaskEnvVarProcessedCorrectly(t *testing.T) {
 	assert := require.New(t)
 	jobId := uniqueJobId()
 
-	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now())
+	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now(), appDir)
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -55,7 +55,7 @@ func TestTaskGroup_AddEnvVar(t *testing.T) {
 	assert := require.New(t)
 	jobId := uniqueJobId()
 
-	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now())
+	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now(), appDir)
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -101,7 +101,7 @@ func TestTaskGroup_Execute(t *testing.T) {
 	assert := require.New(t)
 
 	jobId := uniqueJobId()
-	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now())
+	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now(), appDir)
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -138,7 +138,7 @@ func TestTaskGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
 
 	for _, test := range tests {
 		jobId := uniqueJobId()
-		tg, err := NewTaskGroup(longOpsRepo, context.Background(), 0, jobId, time.Now())
+		tg, err := NewTaskGroup(longOpsRepo, context.Background(), 0, jobId, time.Now(), appDir)
 		assert.NoError(err)
 
 		tg.SetMaxDuration(test.Duration)

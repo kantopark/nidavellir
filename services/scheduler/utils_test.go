@@ -13,12 +13,12 @@ import (
 
 	"github.com/dhui/dktest"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 
-	"nidavellir/config"
+	"nidavellir/services/scheduler"
 )
 
 var (
+	appDir      string
 	jobIds      chan int
 	user        = "user"
 	password    = "password"
@@ -59,7 +59,7 @@ func init() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	viper.Set("app.workdir", dir)
+	appDir = dir
 
 	// creates a finite number of jobIds to mock jobs ids in database
 	size := 1000
@@ -101,9 +101,5 @@ func uniqueJobId() int {
 
 // Gets output directory for test job
 func outputDir(jobId int) (string, error) {
-	conf, err := config.New()
-	if err != nil {
-		return "", err
-	}
-	return conf.App.OutputDir(jobId), nil
+	return scheduler.GetOutputDir(appDir, jobId)
 }

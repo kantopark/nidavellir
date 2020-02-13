@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
 
-	"nidavellir/config"
 	"nidavellir/libs"
 )
 
@@ -42,13 +42,11 @@ type Repo struct {
 // re-clone or pull the actual repo before calling NewRepo). If that is the case,
 // the repo will then checkout any previous versions as specified in the
 // runtime.yaml config file
-func NewRepo(source, name string) (*Repo, error) {
-	conf, err := config.New()
+func NewRepo(source, name, appFolder string) (*Repo, error) {
+	workDir, err := getWorkDir(appFolder, name)
 	if err != nil {
 		return nil, err
 	}
-
-	workDir := conf.App.RepoPath(name)
 	r := &Repo{
 		Source:  source,
 		Name:    libs.LowerTrimReplaceSpace(name),
@@ -225,4 +223,26 @@ func (r *Repo) getCommitHash(commit string) (string, error) {
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+// Gets the image name and tag separately. If no tag is specified, it will be "latest"
+func (r *Repo) ImageTag() (string, string) {
+	parts := strings.Split(r.Image, ":")
+	if len(parts) == 1 {
+		return parts[0], "latest"
+	} else {
+		return parts[0], parts[1]
+	}
+}
+
+func getWorkDir(appFolder, name string) (string, error) {
+	// create repo folder if it doesn't exists
+	folder := filepath.Join(appFolder, "repos")
+	if !libs.PathExists(folder) {
+		err := os.MkdirAll(folder, 0777)
+		if err != nil {
+			return "", err
+		}
+	}
+	return filepath.Join(folder, name), nil
 }

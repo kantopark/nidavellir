@@ -2,9 +2,7 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -41,42 +39,6 @@ func (a *appConfig) Validate() error {
 	}
 
 	return nil
-}
-
-// Returns the path of the repository
-func (a *appConfig) RepoPath(name string) string {
-	name = libs.LowerTrimReplaceSpace(name)
-	return filepath.Join(a.WorkDir, "repo", name)
-}
-
-func (a *appConfig) LogFilePath(name, runDate string) string {
-	dir := a.createFolder("logs", name)
-	return filepath.Join(dir, runDate+".log")
-}
-
-// Gets the image log file path. The path is uniquely defined by the image
-// name and the image tag
-func (a *appConfig) ImageBuildLogPath(name, tag string) string {
-	dir := a.createFolder("image-logs", name)
-
-	return filepath.Join(dir, tag+".log")
-}
-
-func (a *appConfig) OutputDir(jobId int) string {
-	return a.createFolder("output", strconv.Itoa(jobId))
-}
-
-func (a *appConfig) createFolder(group, name string) string {
-	name = libs.LowerTrimReplaceSpace(name)
-	dir := filepath.Join(a.WorkDir, group, name)
-
-	if !libs.PathExists(dir) {
-		if err := os.MkdirAll(dir, 0777); err != nil {
-			panic(err)
-		}
-	}
-
-	return dir
 }
 
 // Checks if the application has TLS certificates

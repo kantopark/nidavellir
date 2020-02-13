@@ -24,6 +24,7 @@ func NewImageBuilder(image, workDir string) (*Builder, error) {
 		return nil, errors.New("directory does not exist")
 	}
 
+	// This is allowed as BuildArgs are not usually accessed from app, so we inject this side-effect
 	conf, err := config.New()
 	if err != nil {
 		return nil, err

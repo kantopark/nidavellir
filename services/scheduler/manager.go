@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"nidavellir/libs"
 	rp "nidavellir/services/repo"
 	"nidavellir/services/store"
 )
@@ -21,17 +22,27 @@ type JobManager struct {
 	started bool
 	// An array of completed jobs by the manager, this is primarily used for testing purposes
 	CompletedJobs []int
+	// Path to folder/volume that stores task output and logs
+	AppFolderPath string
 }
 
 // The manager holds a queue of job. Whenever there are new jobs, it will dispatch
 // the job. At any one time, it can only run one job. Thus the jobs are queued.
-func NewJobManager(db IStore) *JobManager {
+func NewJobManager(db IStore, appFolderPath string) (*JobManager, error) {
+	if !libs.PathExists(appFolderPath) {
+		err := os.MkdirAll(appFolderPath, 0777)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not create data folder")
+		}
+	}
+
 	return &JobManager{
 		queue:         NewTaskQueue(),
 		db:            db,
 		started:       false,
 		CompletedJobs: []int{},
-	}
+		AppFolderPath: appFolderPath,
+	}, nil
 }
 
 // Starts watching for jobs and executing work
@@ -61,12 +72,12 @@ func (m *JobManager) AddJob(source *store.Source, trigger string) error {
 		return err
 	}
 
-	repo, err := rp.NewRepo(source.RepoUrl, source.UniqueName)
+	repo, err := rp.NewRepo(source.RepoUrl, source.UniqueName, m.AppFolderPath)
 	if err != nil {
 		return err
 	}
 
-	tg, err := NewTaskGroup(repo, m.ctx, source.Id, job.Id, source.NextTime)
+	tg, err := NewTaskGroup(repo, m.ctx, source.Id, job.Id, source.NextTime, m.AppFolderPath)
 	if err != nil {
 		return err
 	}
@@ -110,22 +121,22 @@ func (m *JobManager) dispatch(taskGroup *TaskGroup, done <-chan bool) {
 		return
 	}
 	taskDate := regexp.MustCompile(`\D`).ReplaceAllString(taskGroup.TaskDate, "-")
-	file, err := os.OpenFile(logFilePath(taskGroup.Name, taskDate), os.O_CREATE|os.O_RDWR|os.O_APPEND, 0666)
+	logFile, err := NewLogFile(m.AppFolderPath, "logs", taskGroup.Name, taskDate)
 	if err != nil {
-		log.Println(errors.Wrap(err, "could not open log file"))
+		log.Println(errors.Wrap(err, "could not create log file"))
 		return
 	}
-	defer func() { _ = file.Close() }()
+	defer logFile.Close()
 
 	source, job, err := m.retrieveWorkDetails(taskGroup)
 	if err != nil {
-		logOutput(file, err)
+		logFile.AppendContent(err)
 		return
 	}
 
 	err = m.initWork(source, job)
 	if err != nil {
-		logOutput(file, err)
+		logFile.AppendContent(err)
 		return
 	}
 
@@ -133,15 +144,14 @@ func (m *JobManager) dispatch(taskGroup *TaskGroup, done <-chan bool) {
 	logs, err := taskGroup.Execute()
 	if err != nil {
 		_ = m.failWork(source, job)
-		logOutput(file, err)
-
+		logFile.AppendContent(err)
 		return
 	}
 
 	if err := m.completeWork(source, job); err != nil {
-		logOutput(file, err)
+		logFile.AppendContent(err)
 	}
-	logOutput(file, logs)
+	logFile.AppendContent(logs)
 	m.CompletedJobs = append(m.CompletedJobs, job.Id)
 }
 

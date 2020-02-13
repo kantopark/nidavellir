@@ -33,7 +33,7 @@ func TestNewSecret(t *testing.T) {
 			assert.Nil(s)
 		} else {
 			assert.NoError(err)
-			assert.IsType(Source{}, *s)
+			assert.IsType(Secret{}, *s)
 		}
 	}
 }
