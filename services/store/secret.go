@@ -67,6 +67,15 @@ func (p *Postgres) GetSecret(id int) (*Secret, error) {
 	return &s, nil
 }
 
+// Gets all secrets from source Id
+func (p *Postgres) GetSecrets(sourceId int) ([]*Secret, error) {
+	var s []*Secret
+	if err := p.db.Find(&s, "source_id = ?", sourceId).Error; err != nil {
+		return nil, errors.Wrapf(err, "could not get secret record from sourceId: %d", sourceId)
+	}
+	return s, nil
+}
+
 // Updates a secret's key value. The sourceId and key will uniquely identify the secret
 func (p *Postgres) UpdateSecret(secret Secret) (*Secret, error) {
 	if secret.Id == 0 {

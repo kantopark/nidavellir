@@ -105,6 +105,32 @@ func (p *Postgres) GetSource(id int) (*Source, error) {
 	return &source, nil
 }
 
+// Gets a list of jobs sources specified by the option. If nil, lists all job
+// sources
+func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
+	var sources []*Source
+	if options == nil {
+		options = &GetSourceOption{}
+	}
+
+	query := p.db
+	if options.ScheduledToRun {
+		query = query.Where("state = ? AND next_time <= ?", ScheduleNoop, time.Now().UTC())
+	}
+
+	if err := query.Find(&sources).Error; err != nil {
+		return nil, errors.Wrap(err, "error getting sources")
+	}
+
+	if options.MaskSecrets {
+		for _, source := range sources {
+			source.maskSecrets()
+		}
+	}
+
+	return sources, nil
+}
+
 // Updates a job source
 func (p *Postgres) UpdateSource(source Source) (*Source, error) {
 	if err := source.Validate(); err != nil {
@@ -145,32 +171,6 @@ func (p *Postgres) RemoveSource(id int) error {
 type GetSourceOption struct {
 	ScheduledToRun bool
 	MaskSecrets    bool
-}
-
-// Gets a list of jobs sources specified by the option. If nil, lists all job
-// sources
-func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
-	var sources []*Source
-	if options == nil {
-		options = &GetSourceOption{}
-	}
-
-	query := p.db
-	if options.ScheduledToRun {
-		query = query.Where("state = ? AND next_time <= ?", ScheduleNoop, time.Now().UTC())
-	}
-
-	if err := query.Find(&sources).Error; err != nil {
-		return nil, errors.Wrap(err, "error getting sources")
-	}
-
-	if options.MaskSecrets {
-		for _, source := range sources {
-			source.maskSecrets()
-		}
-	}
-
-	return sources, nil
 }
 
 // Masks all secret values

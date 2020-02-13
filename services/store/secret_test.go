@@ -38,6 +38,23 @@ func TestNewSecret(t *testing.T) {
 	}
 }
 
+func TestPostgres_GetSecrets(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		db, err := newTestDb(info, seedSources, seedSecrets)
+		assert.NoError(err)
+
+		sourceId := 2
+		secrets, err := db.GetSecrets(sourceId)
+
+		assert.NoError(err)
+		assert.Len(secrets, (sourceId-1)*2)
+	})
+}
+
 func TestPostgres_AddSecret(t *testing.T) {
 	t.Parallel()
 
@@ -91,12 +108,13 @@ func seedSecrets(db *Postgres) error {
 		return err
 	}
 
-	for i, source := range sources {
-		if i == 0 {
+	// Every source will get (id - 1) * 2 secrets. Thus for id==1, it gets 0 secrets
+	for _, source := range sources {
+		if source.Id == 1 {
 			continue
 		}
 
-		for j := 0; j < i*2; j++ {
+		for j := 0; j < (source.Id-1)*2; j++ {
 			secret, err := NewSecret(source.Id, fmt.Sprintf("key-%d", j), fmt.Sprintf("value-%d", j))
 			if err != nil {
 				return err
