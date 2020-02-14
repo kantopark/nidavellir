@@ -71,7 +71,7 @@ func TestPostgres_GetJobs(t *testing.T) {
 		assert.Len(jobs, 1)
 
 		jobs, err = db.GetJobs(&ListJobOption{
-			State: JobQueued,
+			State: []string{JobQueued},
 		})
 		assert.NoError(err)
 		assert.Len(jobs, 2)

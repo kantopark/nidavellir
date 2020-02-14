@@ -118,8 +118,8 @@ func (p *Postgres) GetJobs(options *ListJobOption) ([]*Job, error) {
 	}
 
 	query := p.db
-	if options.State != "" {
-		query = query.Where("state = ?", options.State)
+	if len(options.State) > 0 {
+		query = query.Where("state IN (?)", options.State)
 	}
 	if options.Trigger != "" {
 		query = query.Where("trigger = ?", options.Trigger)
@@ -137,6 +137,6 @@ func (p *Postgres) GetJobs(options *ListJobOption) ([]*Job, error) {
 
 type ListJobOption struct {
 	Trigger  string
-	State    string
+	State    []string
 	SourceId int
 }

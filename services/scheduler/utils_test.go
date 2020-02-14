@@ -14,7 +14,7 @@ import (
 	"github.com/dhui/dktest"
 	"github.com/pkg/errors"
 
-	"nidavellir/services/scheduler"
+	"nidavellir/services/iofiles"
 )
 
 var (
@@ -101,5 +101,5 @@ func uniqueJobId() int {
 
 // Gets output directory for test job
 func outputDir(jobId int) (string, error) {
-	return scheduler.GetOutputDir(appDir, jobId)
+	return iofiles.GetOutputDir(appDir, jobId)
 }

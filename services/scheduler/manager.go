@@ -6,10 +6,12 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"nidavellir/libs"
+	"nidavellir/services/iofiles"
 	rp "nidavellir/services/repo"
 	"nidavellir/services/store"
 )
@@ -121,7 +123,7 @@ func (m *JobManager) dispatch(taskGroup *TaskGroup, done <-chan bool) {
 		return
 	}
 	taskDate := regexp.MustCompile(`\D`).ReplaceAllString(taskGroup.TaskDate, "-")
-	logFile, err := NewLogFile(m.AppFolderPath, "logs", taskGroup.Name, taskDate)
+	logFile, err := iofiles.NewLogFile(m.AppFolderPath, taskGroup.Name, taskDate, false)
 	if err != nil {
 		log.Println(errors.Wrap(err, "could not create log file"))
 		return
@@ -130,28 +132,32 @@ func (m *JobManager) dispatch(taskGroup *TaskGroup, done <-chan bool) {
 
 	source, job, err := m.retrieveWorkDetails(taskGroup)
 	if err != nil {
-		logFile.AppendContent(err)
+		err = multierror.Append(err, logFile.Write(err))
+		log.Println(err)
 		return
 	}
 
 	err = m.initWork(source, job)
 	if err != nil {
-		logFile.AppendContent(err)
+		err = multierror.Append(err, logFile.Write(err))
+		log.Println(err)
 		return
 	}
 
 	// Execute tasks and save logs if any
 	logs, err := taskGroup.Execute()
 	if err != nil {
-		_ = m.failWork(source, job)
-		logFile.AppendContent(err)
+		err = multierror.Append(err, m.failWork(source, job))
+		err = multierror.Append(err, logFile.Write(err))
+		log.Println(err)
 		return
 	}
 
 	if err := m.completeWork(source, job); err != nil {
-		logFile.AppendContent(err)
+		err = multierror.Append(err, logFile.Write(err))
+		log.Println(err)
 	}
-	logFile.AppendContent(logs)
+	_ = logFile.Write(logs)
 	m.CompletedJobs = append(m.CompletedJobs, job.Id)
 }
 

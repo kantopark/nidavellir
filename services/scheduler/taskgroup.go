@@ -4,17 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/sync/semaphore"
 
-	"nidavellir/libs"
+	"nidavellir/services/iofiles"
 	"nidavellir/services/repo"
 )
 
@@ -34,7 +31,7 @@ type TaskGroup struct {
 }
 
 func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time, dataFolder string) (*TaskGroup, error) {
-	outputDir, err := GetOutputDir(dataFolder, jobId)
+	outputDir, err := iofiles.GetOutputDir(dataFolder, jobId)
 	if err != nil {
 		return nil, err
 	}
@@ -203,24 +200,12 @@ func (t *TaskGroup) pullImage() error {
 // saves the image build logs into a file
 func (t *TaskGroup) logImageOutput(logs string) {
 	image, tag := t.rp.ImageTag()
-	logFile, err := NewLogFile(t.DataFolder, "image-logs", image, tag)
+	logFile, err := iofiles.NewImageLogFile(t.DataFolder, image, tag, false)
 	if err != nil {
 		log.Println(errors.Wrap(err, "could not create log file"))
 		return
 	}
 	defer logFile.Close()
 
-	logFile.AppendContent(logs)
-}
-
-// Creates the folder to store the output from the tasks
-func GetOutputDir(dataFolder string, jobId int) (string, error) {
-	folder := filepath.Join(dataFolder, "output", strconv.Itoa(jobId))
-	if !libs.PathExists(folder) {
-		err := os.MkdirAll(folder, 0777)
-		if err != nil {
-			return folder, err
-		}
-	}
-	return folder, nil
+	_ = logFile.Write(logs)
 }
