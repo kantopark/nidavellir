@@ -29,7 +29,7 @@ func TestStepGroup_ExecuteTasks(t *testing.T) {
 		assert.NoError(err)
 		assert.NotEmpty(logs)
 
-		dir, err := outputDir(jobId)
+		dir, err := outputDir(1, jobId)
 		assert.NoError(err)
 		files, err := ioutil.ReadDir(dir)
 		assert.NoError(err)
@@ -43,7 +43,7 @@ func FormTestStepGroup(repo *rp.Repo, jobId int) (*StepGroup, error) {
 	var tasks []*Task
 
 	for _, ti := range repo.Steps[0].TaskInfoList {
-		outputDir, err := outputDir(jobId)
+		outputDir, err := outputDir(1, jobId)
 		if err != nil {
 			return nil, err
 		}

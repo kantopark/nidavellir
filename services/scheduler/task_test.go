@@ -49,7 +49,7 @@ func TestTask_Execute(t *testing.T) {
 	repo := pythonRepo
 
 	jobId := uniqueJobId()
-	outputDir, err := outputDir(jobId)
+	outputDir, err := outputDir(1, jobId)
 	assert.NoError(err)
 	fileName := "cars.csv"
 

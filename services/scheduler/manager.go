@@ -2,8 +2,9 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"os"
-	"regexp"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -117,13 +118,25 @@ func (m *JobManager) dispatchWork() {
 
 // Executes the TaskGroup
 func (m *JobManager) dispatch(taskGroup *TaskGroup, done <-chan bool) {
-	defer func() { <-done }()
+	defer func() {
+		<-done
+
+		data, err := json.MarshalIndent(struct {
+			Name string `json:"name"`
+			Date string `json:"date"`
+		}{taskGroup.Name, taskGroup.TaskDate}, "", "")
+		if err != nil {
+			log.Printf("could not save task meta data: %s", err.Error())
+		}
+		path := iofiles.GetMetaFilePath(m.AppFolderPath, taskGroup.SourceId, taskGroup.JobId)
+		_ = ioutil.WriteFile(path, data, 0666)
+	}()
 
 	if taskGroup == nil {
 		return
 	}
-	taskDate := regexp.MustCompile(`\D`).ReplaceAllString(taskGroup.TaskDate, "-")
-	logFile, err := iofiles.NewLogFile(m.AppFolderPath, taskGroup.Name, taskDate, false)
+
+	logFile, err := iofiles.NewLogFile(m.AppFolderPath, taskGroup.SourceId, taskGroup.JobId, false)
 	if err != nil {
 		log.Println(errors.Wrap(err, "could not create log file"))
 		return

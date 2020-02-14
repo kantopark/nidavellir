@@ -26,12 +26,12 @@ type TaskGroup struct {
 	TaskDate   string
 	Completed  bool
 	Duration   time.Duration
-	DataFolder string
+	AppFolder  string
 	OutputDir  string
 }
 
-func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time, dataFolder string) (*TaskGroup, error) {
-	outputDir, err := iofiles.GetOutputDir(dataFolder, jobId)
+func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time, appFolder string) (*TaskGroup, error) {
+	outputDir, err := iofiles.GetOutputDir(appFolder, sourceId, jobId)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskD
 		TaskDate:   taskDate.Format("2006-01-02 15:04:05"),
 		Completed:  false,
 		Duration:   1 * time.Hour, // default duration is 1 hour
-		DataFolder: dataFolder,
+		AppFolder:  appFolder,
 		OutputDir:  outputDir,
 	}
 
@@ -199,8 +199,7 @@ func (t *TaskGroup) pullImage() error {
 
 // saves the image build logs into a file
 func (t *TaskGroup) logImageOutput(logs string) {
-	image, tag := t.rp.ImageTag()
-	logFile, err := iofiles.NewImageLogFile(t.DataFolder, image, tag, false)
+	logFile, err := iofiles.NewImageLogFile(t.AppFolder, t.SourceId, t.JobId, false)
 	if err != nil {
 		log.Println(errors.Wrap(err, "could not create log file"))
 		return

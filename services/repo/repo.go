@@ -225,16 +225,6 @@ func (r *Repo) getCommitHash(commit string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// Gets the image name and tag separately. If no tag is specified, it will be "latest"
-func (r *Repo) ImageTag() (string, string) {
-	parts := strings.Split(r.Image, ":")
-	if len(parts) == 1 {
-		return parts[0], "latest"
-	} else {
-		return parts[0], parts[1]
-	}
-}
-
 func getWorkDir(appFolder, name string) (string, error) {
 	// create repo folder if it doesn't exists
 	folder := filepath.Join(appFolder, "repos")

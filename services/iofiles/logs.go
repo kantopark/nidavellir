@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -13,12 +14,12 @@ import (
 )
 
 // Opens a new LogFile instance for general logging purposes.
-func NewLogFile(dataFolder, taskName, taskDate string, readonly bool) (*LogFile, error) {
-	folder, err := createFolder(dataFolder, "logs", taskName)
+func NewLogFile(appFolder string, sourceId, jobId int, readonly bool) (*LogFile, error) {
+	folder, err := createFolder(appFolder, "jobs", strconv.Itoa(sourceId), strconv.Itoa(jobId))
 	if err != nil {
 		return nil, err
 	}
-	file, err := openFile(readonly, folder, taskDate)
+	file, err := openFile(readonly, folder, "logs.txt")
 	if err != nil {
 		return nil, err
 	}
@@ -27,12 +28,12 @@ func NewLogFile(dataFolder, taskName, taskDate string, readonly bool) (*LogFile,
 }
 
 // Opens a new LogFile instance for docker image build logging purposes.
-func NewImageLogFile(dataFolder, imageName, imageTag string, readonly bool) (*LogFile, error) {
-	folder, err := createFolder(dataFolder, "logs", imageName)
+func NewImageLogFile(appFolder string, sourceId, jobId int, readonly bool) (*LogFile, error) {
+	folder, err := createFolder(appFolder, "jobs", strconv.Itoa(sourceId), strconv.Itoa(jobId))
 	if err != nil {
 		return nil, err
 	}
-	file, err := openFile(readonly, folder, imageTag)
+	file, err := openFile(readonly, folder, "image.txt")
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +74,7 @@ func (l *LogFile) Read() (string, error) {
 	return string(content), nil
 }
 
+// Creates the folder from the path element if it does not exist
 func createFolder(elem ...string) (string, error) {
 	folder := filepath.Join(elem...)
 	if !libs.PathExists(folder) {

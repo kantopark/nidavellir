@@ -100,6 +100,6 @@ func uniqueJobId() int {
 }
 
 // Gets output directory for test job
-func outputDir(jobId int) (string, error) {
-	return iofiles.GetOutputDir(appDir, jobId)
+func outputDir(sourceId, jobId int) (string, error) {
+	return iofiles.GetOutputDir(appDir, sourceId, jobId)
 }
