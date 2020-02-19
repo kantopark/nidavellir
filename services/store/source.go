@@ -20,11 +20,11 @@ type Source struct {
 	Id         int    `json:"id"`
 	Name       string `json:"name"`
 	UniqueName string `json:"-"`
-	RepoUrl    string `json:"repo_url"`
+	RepoUrl    string `json:"repoUrl"`
 	// time interval between job and next job in seconds
 	Interval int       `json:"interval"`
 	State    string    `json:"state"`
-	NextTime time.Time `json:"next_time"`
+	NextTime time.Time `json:"nextTime"`
 	Secrets  []Secret  `json:"secrets"`
 }
 

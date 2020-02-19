@@ -21,8 +21,8 @@ type IJobStore interface {
 type JobInfo struct {
 	*store.Job
 	Logs        string   `json:"logs"`
-	ImageLogs   string   `json:"image_logs"`
-	OutputFiles []string `json:"output_files"`
+	ImageLogs   string   `json:"imageLogs"`
+	OutputFiles []string `json:"outputFiles"`
 }
 
 type JobHandler struct {

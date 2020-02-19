@@ -18,10 +18,10 @@ const (
 
 type Job struct {
 	Id        int       `json:"id"`
-	SourceId  int       `json:"source_id"`
-	InitTime  time.Time `json:"init_time"`
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
+	SourceId  int       `json:"sourceId"`
+	InitTime  time.Time `json:"initTime"`
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
 	State     string    `json:"state"`
 	Trigger   string    `json:"trigger"`
 }

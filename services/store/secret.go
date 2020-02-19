@@ -8,7 +8,7 @@ import (
 
 type Secret struct {
 	Id       int    `json:"id"`
-	SourceId int    `json:"source_id"`
+	SourceId int    `json:"sourceId"`
 	Key      string `json:"key"`
 	Value    string `json:"value"`
 }
