@@ -9,7 +9,7 @@ import (
 	. "nidavellir/services/store"
 )
 
-func TestNewUser(t *testing.T) {
+func TestNewAccount(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
 
@@ -25,13 +25,13 @@ func TestNewUser(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		u, err := NewAppUser(test.Username, test.Password)
+		u, err := NewAccount(test.Username, test.Password)
 		if test.HasError {
 			assert.Error(err)
 			assert.Nil(u)
 		} else {
 			assert.NoError(err)
-			assert.IsType(&AppUser{}, u)
+			assert.IsType(&Account{}, u)
 			assert.True(u.HasValidPassword(test.Password))
 			assert.False(u.HasValidPassword(test.Password + "1"))
 		}
@@ -42,27 +42,27 @@ func TestPostgres_AddAppUser(t *testing.T) {
 	t.Parallel()
 
 	assert := require.New(t)
-	users, err := newUsers()
+	accounts, err := newAccounts()
 	assert.NoError(err)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		db, err := newTestDb(info)
 		assert.NoError(err)
 
-		for _, u := range users {
-			u, err := db.AddAppUser(u)
+		for _, u := range accounts {
+			u, err := db.AddAccount(u)
 			assert.NoError(err)
-			assert.IsType(&AppUser{}, u)
+			assert.IsType(&Account{}, u)
 		}
 
 		// all these should lead to errors
-		newUsers, err := newUsers()
+		newAccounts, err := newAccounts()
 		assert.NoError(err)
-		user1 := newUsers[0]
-		_, err = db.AddAppUser(user1)
+		user1 := newAccounts[0]
+		_, err = db.AddAccount(user1)
 		assert.Error(err, "username already exists")
 
-		_, err = db.AddAppUser(&AppUser{
+		_, err = db.AddAccount(&Account{
 			Username: "SomeName",
 			Password: "",
 		})
@@ -75,48 +75,48 @@ func TestPostgres_GetAdminAppUser(t *testing.T) {
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
-		db, err := newTestDb(info, seedUsers)
+		db, err := newTestDb(info, seedAccounts)
 		assert.NoError(err)
 
-		admins, err := db.GetAdminAppUser()
+		admins, err := db.GetAdminAccounts()
 		assert.NoError(err)
 		assert.Len(admins, 1)
 	})
 }
 
-func TestPostgres_GetAppUser(t *testing.T) {
+func TestPostgres_GetAccount(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
-		db, err := newTestDb(info, seedUsers)
+		db, err := newTestDb(info, seedAccounts)
 		assert.NoError(err)
 
-		u, err := db.GetAppUser("admin")
+		u, err := db.GetAccount("admin")
 		assert.NoError(err)
-		assert.IsType(&AppUser{}, u)
+		assert.IsType(&Account{}, u)
 
-		u, err = db.GetAppUser("name does not exist")
+		u, err = db.GetAccount("name does not exist")
 		assert.Error(err)
 		assert.Nil(u)
 	})
 }
 
-func TestPostgres_GetAppUsers(t *testing.T) {
+func TestPostgres_GetAccounts(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
-		db, err := newTestDb(info, seedUsers)
+		db, err := newTestDb(info, seedAccounts)
 		assert.NoError(err)
 
-		users, err := db.GetAppUsers()
+		accounts, err := db.GetAccounts()
 		assert.NoError(err)
 		assert.Condition(func() bool {
-			return len(users) > 0
+			return len(accounts) > 0
 		})
 
-		for _, u := range users {
+		for _, u := range accounts {
 			assert.Empty(u.Password)
 		}
 	})
@@ -127,7 +127,7 @@ func TestPostgres_RemoveAppUser(t *testing.T) {
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
-		db, err := newTestDb(info, seedUsers)
+		db, err := newTestDb(info, seedAccounts)
 		assert.NoError(err)
 
 		tests := []struct {
@@ -139,7 +139,7 @@ func TestPostgres_RemoveAppUser(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			err = db.RemoveAppUser(test.Id)
+			err = db.RemoveAccount(test.Id)
 			if test.HasError {
 				assert.Error(err)
 			} else {
@@ -154,13 +154,13 @@ func TestPostgres_UpdateAppUser(t *testing.T) {
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
-		db, err := newTestDb(info, seedUsers)
+		db, err := newTestDb(info, seedAccounts)
 		assert.NoError(err)
 
-		u, err := db.GetAppUser("admin")
+		u, err := db.GetAccount("admin")
 		assert.NoError(err)
 
-		expected := &AppUser{
+		expected := &Account{
 			Id:       u.Id,
 			Username: "NewAdminName",
 			Password: "NewPassword",
@@ -171,15 +171,15 @@ func TestPostgres_UpdateAppUser(t *testing.T) {
 		u.Username = expected.Username
 		u.Password = expected.Password
 
-		u, err = db.UpdateAppUser(*u)
+		u, err = db.UpdateAccount(*u)
 
 		assert.NoError(err)
 		assert.Equal(expected, u)
 	})
 }
 
-func newUsers() ([]*AppUser, error) {
-	var users []*AppUser
+func newAccounts() ([]*Account, error) {
+	var accounts []*Account
 
 	values := []struct {
 		Username string
@@ -192,24 +192,24 @@ func newUsers() ([]*AppUser, error) {
 	}
 
 	for _, v := range values {
-		u, err := NewAppUser(v.Username, v.Password)
+		u, err := NewAccount(v.Username, v.Password)
 		if err != nil {
 			return nil, err
 		}
 		u.IsAdmin = v.IsAdmin
-		users = append(users, u)
+		accounts = append(accounts, u)
 	}
-	return users, nil
+	return accounts, nil
 }
 
-func seedUsers(db *Postgres) error {
-	users, err := newUsers()
+func seedAccounts(db *Postgres) error {
+	accounts, err := newAccounts()
 	if err != nil {
 		return err
 	}
 
-	for _, u := range users {
-		_, err := db.AddAppUser(u)
+	for _, u := range accounts {
+		_, err := db.AddAccount(u)
 		if err != nil {
 			return err
 		}

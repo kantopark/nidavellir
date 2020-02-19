@@ -1,4 +1,4 @@
-CREATE TABLE app_user
+CREATE TABLE account
 (
     id       SERIAL PRIMARY KEY,
     username VARCHAR(255) UNIQUE CHECK ( length(password) >= 1 ) NOT NULL,
