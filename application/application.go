@@ -27,6 +27,10 @@ func New(server *http.Server, store *store.Postgres, manager *scheduler.JobManag
 		return nil, err
 	}
 
+	if err := createAdminAccount(store, conf); err != nil {
+		return nil, err
+	}
+
 	return &App{
 		closeCh: make(chan struct{}),
 		manager: manager,

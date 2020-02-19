@@ -10,9 +10,9 @@ import (
 )
 
 type Config struct {
-	Admin adminConfig `mapstructure:"admin"`
-	App   appConfig   `mapstructure:"app"`
-	Run   runConfig   `mapstructure:"run"`
+	Acct accountConfig `mapstructure:"account"`
+	App  appConfig     `mapstructure:"app"`
+	Run  runConfig     `mapstructure:"run"`
 }
 
 type IValidate interface {
@@ -39,7 +39,7 @@ func New() (*Config, error) {
 	}
 
 	for _, t := range []IValidate{
-		&config.Admin,
+		&config.Acct,
 		&config.App,
 		&config.Run,
 	} {

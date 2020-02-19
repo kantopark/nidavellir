@@ -6,12 +6,12 @@ import (
 	"nidavellir/libs"
 )
 
-type adminConfig struct {
+type accountConfig struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 }
 
-func (a *adminConfig) Validate() error {
+func (a *accountConfig) Validate() error {
 	a.Username = libs.LowerTrim(a.Username)
 	if a.Username == "" {
 		return errors.New("admin username cannot be empty")

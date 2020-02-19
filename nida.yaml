@@ -1,6 +1,8 @@
-# user administration config. Admin account is a super account that can do many
-# many things in the future
-admin:
+# The account config sets the default username and password on initial load and after reset
+# this account is used to do all source and job operations. When the app is started, this is
+# the default account saved in the database. The password should be changed on startup. This
+# account has the ability to create and remove any subsequent accounts
+account:
   username: admin
   password: password  # change this with the environment variable nida_admin.username
 
@@ -14,7 +16,7 @@ app:
     # path to the public key. Leave empty if not using TLS
     certfile: ""
   # port that the server app runs on
-  port: 8000
+  port: 7050
 
 # container run and build configuration
 run:
