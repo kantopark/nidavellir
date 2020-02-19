@@ -30,7 +30,7 @@ func systemCheck() {
 
 func startDb() (option *store.DbOption, cleanUp func()) {
 	name := "nida-db"
-	port := 8432
+	port := 7432
 	option = &store.DbOption{
 		Host:     "localhost",
 		Port:     port,

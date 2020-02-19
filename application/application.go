@@ -49,12 +49,12 @@ func (a *App) Run() {
 func (a *App) runServer() {
 	if conf := a.conf.App; conf.HasCerts() {
 		tls := conf.TLS
-		log.Info("Running server in HTTPS mode")
+		log.Infof("Running server in HTTPS mode at %s", a.server.Addr)
 		if err := a.server.ListenAndServeTLS(tls.CertFile, tls.KeyFile); err != http.ErrServerClosed {
 			log.WithField("cause", err).Error("server error")
 		}
 	} else {
-		log.Info("Running server in HTTP mode")
+		log.Infof("Running server in HTTP mode at %s", a.server.Addr)
 		if err := a.server.ListenAndServe(); err != http.ErrServerClosed {
 			log.WithField("cause", err).Error("server error")
 		}
