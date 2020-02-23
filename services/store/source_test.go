@@ -17,27 +17,36 @@ func TestNewSource(t *testing.T) {
 	assert := require.New(t)
 
 	tests := []struct {
-		Name     string
-		RepoUrl  string
-		Interval int
-		HasError bool
+		Name    string
+		RepoUrl string
+		Days    []string
+		Times   []string
+		Error   string
 	}{
-		{"Project", "https://git-repo", 30, false},
-		{"123  ", "https://git-repo", 30, true},
-		{"Project", "git-repo", 30, true},
-		{"Project", "https://git-repo", 29, true},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"9:30", "19:30"}, ""},
+		{"123  ", "https://git-repo", []string{"MON", "TUE"}, []string{"09:30", "19:30"}, "name length must be >= 4 characters"},
+		{"Project", "git-repo", []string{"MON", "TUE"}, []string{"09:30", "19:30"}, "invalid repo url"},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, nil, "days cannot be empty"},
+		{"Project", "https://git-repo", nil, []string{"09:30", "19:30"}, "times cannot be empty"},
+		{"Project", "https://git-repo", []string{"INVALID", "TUE"}, []string{"09:30", "19:30"}, "invalid days"},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"-1:30", "19:30"}, "invalid time"},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"24:30", "19:30"}, "invalid time"},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"09:-1", "19:30"}, "invalid time"},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"09:60", "19:30"}, "invalid time"},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"ab:60", "19:30"}, "invalid time"},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"09:cd", "19:30"}, "invalid time"},
+		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"19:30"}, "days and times not same length"},
 	}
 
 	for _, test := range tests {
-		s, err := NewSource(test.Name, test.RepoUrl, time.Now(), test.Interval)
-		if test.HasError {
-			assert.Error(err)
+		s, err := NewSource(test.Name, test.RepoUrl, time.Now(), test.Days, test.Times)
+		if test.Error != "" {
+			assert.Error(err, test.Error)
 			assert.Nil(s)
 		} else {
-			assert.NoError(err)
+			assert.NoError(err, test.Error)
 			assert.IsType(Source{}, *s)
 		}
-
 	}
 }
 
@@ -218,14 +227,15 @@ func TestPostgres_UpdateSource(t *testing.T) {
 func newSources() ([]Source, error) {
 	var sources []Source
 	for _, i := range []struct {
-		Name     string
-		RepoUrl  string
-		Interval int
+		Name    string
+		RepoUrl string
+		Days    []string
+		Times   []string
 	}{
-		{"Project 1", "https://git-repo", 30},
-		{"Project 2", "https://git-repo", 30},
+		{"Project 1", "https://git-repo", []string{"MON", "TUE"}, []string{"9:30", "19:30"}},
+		{"Project 2", "https://git-repo", []string{"MON", "TUE"}, []string{"9:30", "19:30"}},
 	} {
-		s, err := NewSource(i.Name, i.RepoUrl, time.Now(), i.Interval)
+		s, err := NewSource(i.Name, i.RepoUrl, time.Now(), i.Days, i.Times)
 		if err != nil {
 			return nil, err
 		}
