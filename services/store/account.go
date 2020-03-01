@@ -39,6 +39,11 @@ func (u *Account) HasValidPassword(password string) bool {
 	return u.Password == password
 }
 
+// Hides all sensitive data
+func (u *Account) MaskSensitiveData() {
+	u.Password = ""
+}
+
 func (p *Postgres) GetAdminAccounts() ([]*Account, error) {
 	var accounts []*Account
 	if err := p.db.Find(&accounts, "is_admin = ?", true).Error; err != nil {
