@@ -11,16 +11,16 @@ CREATE TABLE IF NOT EXISTS source
 CREATE TABLE IF NOT EXISTS schedule
 (
     id        SERIAL PRIMARY KEY,
-    source_id INTEGER REFERENCES source (id),
+    source_id INTEGER REFERENCES source (id) ON DELETE CASCADE,
     day       VARCHAR(20) NOT NULL,
-    time      VARCHAR(5) CHECK ( length(time) == 5),
+    time      VARCHAR(5) CHECK ( length(time) = 5),
     UNIQUE (source_id, day, time)
 );
 
 CREATE TABLE secret
 (
     id        SERIAL PRIMARY KEY,
-    source_id INTEGER REFERENCES source (id),
+    source_id INTEGER REFERENCES source (id) ON DELETE CASCADE,
     key       VARCHAR(255) CHECK ( length(key) >= 1 ) NOT NULL,
     value     TEXT CHECK ( length(value) >= 1 )       NOT NULL,
     UNIQUE (source_id, key)

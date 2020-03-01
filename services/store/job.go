@@ -31,7 +31,7 @@ func (j *Job) ToStartState() error {
 		return errors.Errorf("cannot reach '%s' state from '%s' state", JobRunning, j.State)
 	}
 
-	j.StartTime = time.Now().UTC()
+	j.StartTime = time.Now()
 	j.State = JobRunning
 
 	return nil
@@ -42,7 +42,7 @@ func (j *Job) ToFailureState() error {
 		return errors.Errorf("cannot reach '%s' state from '%s' state", JobFailure, j.State)
 	}
 
-	j.EndTime = time.Now().UTC()
+	j.EndTime = time.Now()
 	j.State = JobFailure
 
 	return nil
@@ -53,7 +53,7 @@ func (j *Job) ToSuccessState() error {
 		return errors.Errorf("cannot reach '%s' state from '%s' state", JobSuccess, j.State)
 	}
 
-	j.EndTime = time.Now().UTC()
+	j.EndTime = time.Now()
 	j.State = JobSuccess
 
 	return nil
@@ -67,7 +67,7 @@ func (p *Postgres) AddJob(sourceId int, trigger string) (*Job, error) {
 
 	job := &Job{
 		SourceId:  sourceId,
-		InitTime:  time.Now().UTC(),
+		InitTime:  time.Now(),
 		StartTime: time.Time{},
 		EndTime:   time.Time{},
 		State:     JobQueued,

@@ -1,9 +1,7 @@
 package store
 
 import (
-	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,45 +14,26 @@ const (
 	ScheduleQueued  = "QUEUED"
 	ScheduleRunning = "RUNNING"
 	ScheduleNoop    = "NOOP"
-	SEP             = "::"
 )
 
-var weekDayMap = map[string]int{"SUN": 0, "MON": 1, "TUE": 2, "WED": 3, "THU": 4, "FRI": 5, "SAT": 6}
-
 type Source struct {
-	Id         int       `json:"id"`
-	Name       string    `json:"name"`
-	UniqueName string    `json:"-"`
-	RepoUrl    string    `json:"repoUrl"`
-	Days       string    `json:"days"`
-	Times      string    `json:"times"`
-	State      string    `json:"state"`
-	NextTime   time.Time `json:"nextTime"`
-	Secrets    []Secret  `json:"secrets"`
+	Id         int        `json:"id"`
+	Name       string     `json:"name"`
+	UniqueName string     `json:"-"`
+	RepoUrl    string     `json:"repoUrl"`
+	State      string     `json:"state"`
+	NextTime   time.Time  `json:"nextTime"`
+	Secrets    []Secret   `json:"secrets"`
+	Schedules  []Schedule `json:"schedules"`
 }
 
-func NewSource(name, repoUrl string, startTime time.Time, days []string, times []string) (s *Source, err error) {
+func NewSource(name, repoUrl string, startTime time.Time) (s *Source, err error) {
 	name = strings.TrimSpace(name)
-
-	// time check is done here instead as it is used to set the value later
-	reg := regexp.MustCompile(`\d{1,2}:\d{1,2}`)
-	for i, t := range times {
-		if !reg.MatchString(t) {
-			return nil, errors.New("time must be in format hh:mm")
-		}
-
-		times[i], err = validateTime(t)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	s = &Source{
 		Name:       name,
 		UniqueName: libs.LowerTrimReplaceSpace(name),
 		RepoUrl:    repoUrl,
-		Days:       libs.UpperTrim(strings.Join(days, SEP)),
-		Times:      strings.Join(times, SEP),
 		State:      ScheduleNoop,
 		NextTime:   startTime,
 	}
@@ -80,43 +59,7 @@ func (s *Source) Validate() error {
 		return errors.Errorf("'%s' is an invalid schedule state", s.State)
 	}
 
-	days, times := s.DaysAndTime()
-	if len(days) == 0 || len(times) == 0 {
-		return errors.New("days or times schedule cannot be empty")
-	}
-
-	for _, day := range days {
-		if _, exists := weekDayMap[day]; !exists {
-			var validDays []string
-			for k := range weekDayMap {
-				validDays = append(days, k)
-			}
-			return errors.Errorf("'%s' is not a supported day. use one of %v", day, validDays)
-		}
-	}
-
-	if len(times) != len(days) {
-		return errors.Errorf("days and times array must match!")
-	}
-
 	return nil
-}
-
-func validateTime(t string) (string, error) {
-	timeParts := strings.Split(strings.TrimSpace(t), ":")
-	h, err := strconv.Atoi(timeParts[0])
-	if err != nil {
-		return "", errors.Wrapf(err, "invalid time '%s'", t)
-	} else if h < 0 || h >= 24 {
-		return "", errors.Errorf("invalid time '%s'", t)
-	}
-	m, err := strconv.Atoi(timeParts[1])
-	if err != nil {
-		return "", errors.Wrapf(err, "invalid time '%s'", t)
-	} else if m < 0 || m >= 60 {
-		return "", errors.Errorf("invalid time '%s'", t)
-	}
-	return fmt.Sprintf("%02d:%02d", h, m), nil
 }
 
 // sets the source state to Running
@@ -126,48 +69,96 @@ func (s *Source) ToRunning() *Source {
 }
 
 // Sets the job's state to completed and calculates the next runtime
-func (s *Source) ToCompleted() *Source {
-	s.NextTime = s.DeriveNextTime()
+func (s *Source) ToCompleted() (*Source, error) {
+	now := time.Now()
+	// set never to run again first
+	s.NextTime = time.Date(9999, 1, 1, 0, 0, 0, 0, time.Local)
+
+	// Set next time to the minimum of the lowest next scheduled time, if schedule is empty, it will
+	// use the max time and never effectively run again
+	for _, sc := range s.Schedules {
+		if t := sc.NextTime(now); t.Before(s.NextTime) {
+			s.NextTime = t
+		}
+	}
+
 	s.State = ScheduleNoop
-	return s
+	return s, nil
 }
 
-// Derives the next run time for the Source
-func (s *Source) DeriveNextTime() (nextTime time.Time) {
-	now := time.Now().UTC()
-	dow := now.Weekday() // day of week
+// Simplify the schedule so that if the schedule all weekdays are selected, instead of having
+// 5 schedules for each day with the same time, it'll be a weekday schedule with the same time.
+// Same for everyday. It returns 2 list of schedule, one to add and another to remove
+func (s *Source) SimplifySchedule() (add []*Schedule, remove []*Schedule, err error) {
+	timeDayMap := make(map[string][]string)
 
-	// loop through all the date and times in schedule
-	// form time that fits the datetime schdule but greater than now
-	// take the earliest time
-	days, times := s.DaysAndTime()
-	for i, d := range days {
-		timeParts := strings.Split(times[i], ":")
-		hour, _ := strconv.Atoi(timeParts[0])
-		minute, _ := strconv.Atoi(timeParts[1])
+	for _, sc := range s.Schedules {
+		timeDayMap[sc.Time] = append(timeDayMap[sc.Time], sc.Day)
+	}
 
-		// the following calculates the next run date for the schedule
-		dayDiff := (weekDayMap[d] - int(dow) + 7) % 7
-		t := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, time.UTC).AddDate(0, 0, dayDiff)
-		if t.Before(now) {
-			// in the event that this schedule is on the same day but the scheduled time is currently past now, we
-			// schedule it for next week
-			t = t.AddDate(0, 0, 7)
+	for t, arr := range timeDayMap {
+		isWeekday := false
+		isEveryday := false
+		var days []string
+
+		// check if there is everyday or weekday, if not add days to a day array
+		for _, day := range arr {
+			if day == Everyday {
+				isEveryday = true
+				break
+			} else if day == Weekday {
+				isWeekday = true
+			} else {
+				days = append(days, day)
+			}
 		}
 
-		if nextTime.IsZero() || t.Before(nextTime) {
-			nextTime = t
+		// check if days == 5 and all 5 days are weekdays, if so, convert to weekday
+		if libs.StringArrayEqual(days, []string{Monday, Tuesday, Wednesday, Thursday, Friday}) {
+			isWeekday = true
+		}
+		if libs.StringArrayEqual(days, []string{Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday}) {
+			isEveryday = true
+		}
+
+		if isEveryday {
+			hasEveryday := false
+			for _, sc := range s.Schedules {
+				if sc.Day == Everyday {
+					hasEveryday = true
+				} else {
+					remove = append(remove, &sc)
+				}
+			}
+
+			if !hasEveryday {
+				s, err := NewSchedule(s.Id, Everyday, t)
+				if err != nil {
+					return nil, nil, err
+				}
+				add = append(add, s)
+			}
+		} else if isWeekday {
+			hasWeekday := false
+			for _, sc := range s.Schedules {
+				if sc.Day == Weekday {
+					hasWeekday = true
+				} else {
+					remove = append(remove, &sc)
+				}
+			}
+
+			if !hasWeekday {
+				s, err := NewSchedule(s.Id, Weekday, t)
+				if err != nil {
+					return nil, nil, err
+				}
+				add = append(add, s)
+			}
 		}
 	}
 
 	return
-}
-
-func (s *Source) DaysAndTime() ([]string, []string) {
-	days := strings.Split(s.Days, SEP)
-	times := strings.Split(s.Times, SEP)
-
-	return days, times
 }
 
 // Adds a new job source
@@ -209,7 +200,7 @@ func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
 
 	query := p.db
 	if options.ScheduledToRun {
-		query = query.Where("state = ? AND next_time <= ?", ScheduleNoop, time.Now().UTC())
+		query = query.Where("state = ? AND next_time <= ?", ScheduleNoop, time.Now())
 	}
 
 	if err := query.Find(&sources).Error; err != nil {

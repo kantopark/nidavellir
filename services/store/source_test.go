@@ -19,27 +19,15 @@ func TestNewSource(t *testing.T) {
 	tests := []struct {
 		Name    string
 		RepoUrl string
-		Days    []string
-		Times   []string
 		Error   string
 	}{
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"9:30", "19:30"}, ""},
-		{"123  ", "https://git-repo", []string{"MON", "TUE"}, []string{"09:30", "19:30"}, "name length must be >= 4 characters"},
-		{"Project", "git-repo", []string{"MON", "TUE"}, []string{"09:30", "19:30"}, "invalid repo url"},
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, nil, "days cannot be empty"},
-		{"Project", "https://git-repo", nil, []string{"09:30", "19:30"}, "times cannot be empty"},
-		{"Project", "https://git-repo", []string{"INVALID", "TUE"}, []string{"09:30", "19:30"}, "invalid days"},
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"-1:30", "19:30"}, "invalid time"},
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"24:30", "19:30"}, "invalid time"},
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"09:-1", "19:30"}, "invalid time"},
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"09:60", "19:30"}, "invalid time"},
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"ab:60", "19:30"}, "invalid time"},
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"09:cd", "19:30"}, "invalid time"},
-		{"Project", "https://git-repo", []string{"MON", "TUE"}, []string{"19:30"}, "days and times not same length"},
+		{"Project", "https://git-repo", ""},
+		{"123  ", "https://git-repo", "name length must be >= 4 characters"},
+		{"Project", "git-repo", "invalid repo url"},
 	}
 
 	for _, test := range tests {
-		s, err := NewSource(test.Name, test.RepoUrl, time.Now(), test.Days, test.Times)
+		s, err := NewSource(test.Name, test.RepoUrl, time.Now())
 		if test.Error != "" {
 			assert.Error(err, test.Error)
 			assert.Nil(s)
@@ -64,7 +52,7 @@ func TestPostgres_AddSource(t *testing.T) {
 		for _, s := range sources {
 			s, err := db.AddSource(s)
 			assert.NoError(err)
-			assert.IsType(Source{}, *s)
+			assert.IsType(&Source{}, s)
 		}
 	})
 }
@@ -102,9 +90,9 @@ func TestPostgres_GetSources(t *testing.T) {
 		for i, s := range sources {
 			// Creating these differences to test list with scheduled option
 			if i == 0 {
-				s.NextTime = time.Now().UTC().Add(-10 * time.Hour)
+				s.NextTime = time.Now().Add(-10 * time.Hour)
 			} else {
-				s.NextTime = time.Now().UTC().Add(10 * time.Hour)
+				s.NextTime = time.Now().Add(10 * time.Hour)
 			}
 			_, err := db.AddSource(s)
 			assert.NoError(err)
@@ -227,18 +215,19 @@ func TestPostgres_UpdateSource(t *testing.T) {
 func newSources() ([]Source, error) {
 	var sources []Source
 	for _, i := range []struct {
-		Name    string
-		RepoUrl string
-		Days    []string
-		Times   []string
+		Name      string
+		RepoUrl   string
+		Schedules []Schedule
 	}{
-		{"Project 1", "https://git-repo", []string{"MON", "TUE"}, []string{"9:30", "19:30"}},
-		{"Project 2", "https://git-repo", []string{"MON", "TUE"}, []string{"9:30", "19:30"}},
+		{"Project 1", "https://git-repo", nil},
+		{"Project 2", "https://git-repo", []Schedule{{Day: "Everyday", Time: "09:00"}}},
 	} {
-		s, err := NewSource(i.Name, i.RepoUrl, time.Now(), i.Days, i.Times)
+		s, err := NewSource(i.Name, i.RepoUrl, time.Now())
 		if err != nil {
 			return nil, err
 		}
+
+		s.Schedules = i.Schedules
 		sources = append(sources, *s)
 	}
 	return sources, nil
