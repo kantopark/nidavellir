@@ -45,17 +45,17 @@ func (s *Secret) Validate() error {
 }
 
 // Adds a secret
-func (p *Postgres) AddSecret(secret Secret) (*Secret, error) {
+func (p *Postgres) AddSecret(secret *Secret) (*Secret, error) {
 	secret.Id = 0
 	if err := secret.Validate(); err != nil {
 		return nil, err
 	}
 
-	if err := p.db.Create(&secret).Error; err != nil {
+	if err := p.db.Create(secret).Error; err != nil {
 		return nil, errors.Wrapf(err, "could not create secret for source id %d", secret.SourceId)
 	}
 
-	return &secret, nil
+	return secret, nil
 }
 
 // Gets a secret by its id
@@ -77,7 +77,7 @@ func (p *Postgres) GetSecrets(sourceId int) ([]*Secret, error) {
 }
 
 // Updates a secret's key value. The sourceId and key will uniquely identify the secret
-func (p *Postgres) UpdateSecret(secret Secret) (*Secret, error) {
+func (p *Postgres) UpdateSecret(secret *Secret) (*Secret, error) {
 	if secret.Id == 0 {
 		return nil, errors.New("updated secret's id not specified")
 	}
@@ -87,15 +87,15 @@ func (p *Postgres) UpdateSecret(secret Secret) (*Secret, error) {
 	}
 
 	err := p.db.
-		Model(&secret).
+		Model(secret).
 		Where("id = ?", secret.Id).
-		Update(secret).
+		Update(*secret).
 		Error
 	if err != nil {
 		return nil, errors.Wrap(err, "could not update source")
 	}
 
-	return &secret, nil
+	return secret, nil
 }
 
 // Removes a secret. The id will uniquely identify the secret

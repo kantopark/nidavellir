@@ -162,17 +162,17 @@ func (s *Source) SimplifySchedule() (add []*Schedule, remove []*Schedule, err er
 }
 
 // Adds a new job source
-func (p *Postgres) AddSource(source Source) (*Source, error) {
+func (p *Postgres) AddSource(source *Source) (*Source, error) {
 	source.Id = 0 // force primary key to be empty
 	if err := source.Validate(); err != nil {
 		return nil, err
 	}
 
-	if err := p.db.Create(&source).Error; err != nil {
+	if err := p.db.Create(source).Error; err != nil {
 		return nil, errors.Wrap(err, "could not create new source")
 	}
 
-	return &source, nil
+	return source, nil
 }
 
 // Gets the source with the specified id
@@ -217,7 +217,7 @@ func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
 }
 
 // Updates a job source
-func (p *Postgres) UpdateSource(source Source) (*Source, error) {
+func (p *Postgres) UpdateSource(source *Source) (*Source, error) {
 	if err := source.Validate(); err != nil {
 		return nil, err
 	} else if source.Id <= 0 {
@@ -225,15 +225,15 @@ func (p *Postgres) UpdateSource(source Source) (*Source, error) {
 	}
 
 	err := p.db.
-		Model(&source).
+		Model(source).
 		Where("id = ?", source.Id).
-		Update(source).
+		Update(*source).
 		Error
 	if err != nil {
 		return nil, errors.Wrap(err, "could not update source")
 	}
 
-	return &source, nil
+	return source, nil
 }
 
 // Removes a job source

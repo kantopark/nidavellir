@@ -171,7 +171,7 @@ func TestPostgres_UpdateAppUser(t *testing.T) {
 		u.Username = expected.Username
 		u.Password = expected.Password
 
-		u, err = db.UpdateAccount(*u)
+		u, err = db.UpdateAccount(u)
 
 		assert.NoError(err)
 		assert.Equal(expected, u)

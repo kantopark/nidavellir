@@ -79,7 +79,7 @@ func TestPostgres_UpdateSecret(t *testing.T) {
 		assert.NoError(err)
 		s.Value = "ABC123"
 
-		s, err = db.UpdateSecret(*s)
+		s, err = db.UpdateSecret(s)
 		assert.NoError(err)
 
 		s2, err := db.GetSecret(1)
@@ -119,7 +119,7 @@ func seedSecrets(db *Postgres) error {
 			if err != nil {
 				return err
 			}
-			if _, err := db.AddSecret(*secret); err != nil {
+			if _, err := db.AddSecret(secret); err != nil {
 				return err
 			}
 		}

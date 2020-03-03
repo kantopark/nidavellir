@@ -51,13 +51,14 @@ func NewSchedule(sourceId int, day, time string) (*Schedule, error) {
 		Time:     time,
 	}
 
-	if err := s.Format(); err != nil {
+	if err := s.Validate(); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-func (s *Schedule) Format() error {
+// Validates and formats the schedule instance
+func (s *Schedule) Validate() error {
 	// time check is done here instead as it is used to set the value later
 	if !timeCheckRegex.MatchString(s.Time) {
 		return errors.New("time must be in format hh:mm")

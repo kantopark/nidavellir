@@ -97,7 +97,7 @@ func (p *Postgres) AddAccount(account *Account) (*Account, error) {
 
 // Updates a account's username and password. The caller should check that it is the admin calling
 // this method
-func (p *Postgres) UpdateAccount(account Account) (*Account, error) {
+func (p *Postgres) UpdateAccount(account *Account) (*Account, error) {
 	if account.Id <= 0 {
 		return nil, errors.New("account id must be specified")
 	}
@@ -110,15 +110,15 @@ func (p *Postgres) UpdateAccount(account Account) (*Account, error) {
 	}
 
 	err := p.db.
-		Model(&account).
+		Model(account).
 		Where("id = ?", account.Id).
-		Update(account).
+		Update(*account).
 		Error
 	if err != nil {
 		return nil, errors.Wrap(err, "could not update account")
 	}
 
-	return &account, nil
+	return account, nil
 }
 
 // Removes the Account. The caller should check that it is the admin calling this method
