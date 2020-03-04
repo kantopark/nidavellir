@@ -40,7 +40,7 @@ func NewJobManager(db IStore, appFolderPath string) (*JobManager, error) {
 	}
 
 	return &JobManager{
-		queue:         NewTaskQueue(),
+		queue:         NewJobQueue(),
 		db:            db,
 		started:       false,
 		CompletedJobs: []int{},
@@ -89,7 +89,13 @@ func (m *JobManager) AddJob(source *store.Source, trigger string) error {
 	extraEnv["task_date"] = source.NextTime.Format("2006-01-02 15:04:05")
 	tg.AddEnvVar(extraEnv)
 
-	m.queue.Enqueue(tg)
+	switch trigger {
+	case store.TriggerManual:
+		m.queue.EnqueueTop(tg)
+	default:
+		m.queue.Enqueue(tg)
+	}
+
 	return nil
 }
 
