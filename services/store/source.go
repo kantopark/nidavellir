@@ -69,7 +69,7 @@ func (s *Source) ToRunning() *Source {
 }
 
 // Sets the job's state to completed and calculates the next runtime
-func (s *Source) ToCompleted() (*Source, error) {
+func (s *Source) ToCompleted() *Source {
 	now := time.Now()
 	// set never to run again first
 	s.NextTime = time.Date(9999, 1, 1, 0, 0, 0, 0, time.Local)
@@ -83,7 +83,7 @@ func (s *Source) ToCompleted() (*Source, error) {
 	}
 
 	s.State = ScheduleNoop
-	return s, nil
+	return s
 }
 
 // Simplify the schedule so that if the schedule all weekdays are selected, instead of having
