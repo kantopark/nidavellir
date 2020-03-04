@@ -49,13 +49,13 @@ type LogFile struct {
 
 // Writes the error or logs into the log file and into the standard output
 func (l *LogFile) Write(content interface{}) error {
-	if !l.readonly {
-		return errors.New("cannot append content when file is not readonly")
+	if l.readonly {
+		return errors.New("cannot append content when file is readonly")
 	}
 	mw := io.MultiWriter(os.Stdout, l.file)
 	logger := log.New()
 	logger.SetOutput(mw)
-	logger.Println(content)
+	logger.Printf("%s", content)
 
 	return nil
 }
