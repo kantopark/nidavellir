@@ -11,6 +11,7 @@ import (
 var (
 	pythonRepo  *repo.Repo
 	longOpsRepo *repo.Repo
+	failureRepo *repo.Repo
 )
 
 // clones all repos concurrently
@@ -18,17 +19,24 @@ func initRepos() {
 	errCh := make(chan error)
 	done := make(chan bool, 1)
 	var wg sync.WaitGroup
-	wg.Add(2)
 
-	go func() {
-		defer wg.Done()
-		pythonRepo = pullRepo("https://github.com/kantopark/python-test-repo", errCh)
-	}()
+	sourceDetails := []struct {
+		Repo **repo.Repo
+		Url  string
+	}{
+		{&pythonRepo, "https://github.com/kantopark/python-test-repo"},
+		{&longOpsRepo, "https://github.com/kantopark/python-test-long-ops-repo"},
+		{&failureRepo, "https://github.com/kantopark/python-test-failure-repo"},
+	}
 
-	go func() {
-		defer wg.Done()
-		longOpsRepo = pullRepo("https://github.com/kantopark/python-test-long-ops-repo", errCh)
-	}()
+	wg.Add(len(sourceDetails))
+
+	for _, source := range sourceDetails {
+		go func(r **repo.Repo, url string, _errCh chan error) {
+			defer wg.Done()
+			*r = pullRepo(url, _errCh)
+		}(source.Repo, source.Url, errCh)
+	}
 
 	go func() {
 		wg.Wait()

@@ -151,3 +151,15 @@ func TestTaskGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
 		}
 	}
 }
+
+func TestTaskGroup_ExitsWithNonZeroFailureCodes(t *testing.T) {
+	assert := require.New(t)
+
+	jobId := uniqueJobId()
+	tg, err := NewTaskGroup(failureRepo, context.Background(), 0, jobId, time.Now(), appDir)
+	assert.NoError(err)
+
+	logs, err := tg.Execute()
+	assert.Error(err)
+	assert.NotEmpty(logs)
+}

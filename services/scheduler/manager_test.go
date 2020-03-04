@@ -1,6 +1,9 @@
 package scheduler_test
 
 import (
+	"io/ioutil"
+	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -151,6 +154,7 @@ func TestNewJobManager_NoTimeOut(t *testing.T) {
 		err = manager.AddJob(source, store.TriggerSchedule)
 		assert.NoError(err)
 
+	loop:
 		for {
 			select {
 			case <-time.After(5 * time.Second):
@@ -158,10 +162,14 @@ func TestNewJobManager_NoTimeOut(t *testing.T) {
 				if len(manager.CompletedJobs) > 0 {
 					// set break point at this line.
 					manager.Close()
-					return
+					break loop
 				}
 			}
 		}
 
+		logFilePath := filepath.Join(manager.AppFolderPath, "jobs", strconv.Itoa(source.Id), "1", "logs.txt")
+		content, err := ioutil.ReadFile(logFilePath)
+		assert.NoError(err)
+		assert.NotEmpty(string(content))
 	})
 }

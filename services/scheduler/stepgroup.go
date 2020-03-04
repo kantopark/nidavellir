@@ -76,25 +76,25 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 func runTask(sem *semaphore.Weighted, wg *sync.WaitGroup, ctx context.Context, task *Task, errCh chan<- error, ls *LogSlice) {
 	defer sem.Release(1)
 	defer wg.Done()
-	logCh := make(chan string)
+	done := make(chan bool, 1)
 
 	go func() {
 		if logs, err := task.Execute(); err != nil {
 			errCh <- errors.Wrapf(err, "error executing task: %s", task.TaskName)
 		} else {
-			logCh <- fmt.Sprintf(`
+			ls.Append(fmt.Sprintf(`
 Task: %s
 
 %s
-`, task.TaskName, logs)
+`, task.TaskName, logs))
 		}
+		close(done)
 	}()
 
 	select {
-	case logs := <-logCh:
-		ls.Append(logs)
 	case <-ctx.Done():
 		errCh <- ctx.Err()
+	case <-done:
 	}
 }
 
