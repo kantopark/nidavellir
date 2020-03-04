@@ -40,7 +40,6 @@ func TestNewSecret(t *testing.T) {
 
 func TestPostgres_GetSecrets(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
@@ -57,7 +56,6 @@ func TestPostgres_GetSecrets(t *testing.T) {
 
 func TestPostgres_AddSecret(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
@@ -68,7 +66,6 @@ func TestPostgres_AddSecret(t *testing.T) {
 
 func TestPostgres_UpdateSecret(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
@@ -90,7 +87,6 @@ func TestPostgres_UpdateSecret(t *testing.T) {
 
 func TestPostgres_RemoveSecret(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {

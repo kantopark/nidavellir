@@ -28,7 +28,7 @@ func NewSecret(sourceId int, key, value string) (*Secret, error) {
 }
 
 func (s *Secret) Validate() error {
-	if s.SourceId == 0 {
+	if s.SourceId <= 0 {
 		return errors.New("source id not specified")
 	}
 
@@ -92,7 +92,7 @@ func (p *Postgres) UpdateSecret(secret *Secret) (*Secret, error) {
 		Update(*secret).
 		Error
 	if err != nil {
-		return nil, errors.Wrap(err, "could not update source")
+		return nil, errors.Wrap(err, "could not update secret")
 	}
 
 	return secret, nil

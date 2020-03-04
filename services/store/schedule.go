@@ -32,8 +32,8 @@ var (
 		Thursday:  4,
 		Friday:    5,
 		Saturday:  6,
-		Weekday:   10,
-		Everyday:  11,
+		Weekday:   7,
+		Everyday:  8,
 	}
 )
 
@@ -59,6 +59,10 @@ func NewSchedule(sourceId int, day, time string) (*Schedule, error) {
 
 // Validates and formats the schedule instance
 func (s *Schedule) Validate() error {
+	if s.SourceId <= 0 {
+		return errors.New("source id not specified")
+	}
+
 	// time check is done here instead as it is used to set the value later
 	if !timeCheckRegex.MatchString(s.Time) {
 		return errors.New("time must be in format hh:mm")
@@ -139,21 +143,72 @@ func (s *Schedule) NextTime(now time.Time) time.Time {
 	}
 }
 
-func (s *Schedule) hourMinute() (int, int, error) {
+// Gets the hour and minute portion from the time
+func (s *Schedule) hourMinute() (hour int, minute int, err error) {
 	timeParts := strings.Split(s.Time, ":")
-	h, err := strconv.Atoi(timeParts[0])
+	hour, err = strconv.Atoi(timeParts[0])
 	if err != nil {
 		return 0, 0, errors.Wrapf(err, "invalid time '%s'", s.Time)
-	} else if h < 0 || h >= 24 {
+	} else if hour < 0 || hour >= 24 {
 		return 0, 0, errors.Errorf("invalid time '%s'", s.Time)
 	}
 
-	m, err := strconv.Atoi(timeParts[1])
+	minute, err = strconv.Atoi(timeParts[1])
 	if err != nil {
 		return 0, 0, errors.Wrapf(err, "invalid time '%s'", s.Time)
-	} else if m < 0 || m >= 60 {
+	} else if minute < 0 || minute >= 60 {
 		return 0, 0, errors.Errorf("invalid time '%s'", s.Time)
 	}
 
-	return h, m, nil
+	return
+}
+
+// Adds a schedule to the source
+func (p *Postgres) AddSchedule(schedule *Schedule) (*Schedule, error) {
+	schedule.Id = 0
+	if err := schedule.Validate(); err != nil {
+		return nil, err
+	}
+
+	if err := p.db.Create(schedule).Error; err != nil {
+		return nil, err
+	}
+
+	return schedule, nil
+}
+
+// Updates the schedule
+func (p *Postgres) UpdateSchedule(schedule *Schedule) (*Schedule, error) {
+	if schedule.Id == 0 {
+		return nil, errors.New("updated secret's id not specified")
+	}
+
+	if err := schedule.Validate(); err != nil {
+		return nil, err
+	}
+
+	err := p.db.
+		Model(schedule).
+		Where("id = ?", schedule.Id).
+		Update(*schedule).
+		Error
+	if err != nil {
+		return nil, errors.Wrap(err, "could not update schedule")
+	}
+
+	return schedule, nil
+}
+
+// Removes a schedule. The id will uniquely identify the schedule
+func (p *Postgres) RemoveSchedule(id int) error {
+	var s *Schedule
+	if err := p.db.First(&s, "id = ?", id).Error; err != nil {
+		return errors.Wrapf(err, "could not get schedule with id: %d", id)
+	}
+
+	if err := p.db.Delete(s).Error; err != nil {
+		return errors.Wrap(err, "could not remove secret record")
+	}
+
+	return nil
 }

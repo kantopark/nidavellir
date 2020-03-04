@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dhui/dktest"
 	"github.com/stretchr/testify/require"
 
 	. "nidavellir/services/store"
@@ -77,4 +78,93 @@ func TestSchedule_NextTime(t *testing.T) {
 		nextTime := s.NextTime(now.AddDate(0, 0, test.Offset))
 		assert.Truef(nextTime.Equal(test.NextTime), "Expected: %v, Actual: %v", test.NextTime, nextTime)
 	}
+}
+
+func TestPostgres_AddSchedule(t *testing.T) {
+	t.Parallel()
+
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		_, err := newTestDb(info, seedSources, seedSchedules)
+		assert.NoError(err)
+	})
+}
+
+func TestPostgres_RemoveSchedule(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		db, err := newTestDb(info, seedSources, seedSchedules)
+		assert.NoError(err)
+
+		// there should be a source with id 2 and with more than 0 schedules
+		source, err := db.GetSource(2)
+		assert.NoError(err)
+
+		n := len(source.Schedules)
+		assert.True(n > 0)
+
+		// Remove schedule
+		err = db.RemoveSchedule(source.Schedules[0].Id)
+		assert.NoError(err)
+
+		// fetch source again and check that it's schedule len dropped
+		source, err = db.GetSource(2)
+		assert.NoError(err)
+		assert.Len(source.Schedules, n-1)
+	})
+}
+
+func TestPostgres_UpdateSchedule(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		db, err := newTestDb(info, seedSources, seedSchedules)
+		assert.NoError(err)
+
+		source, err := db.GetSource(2)
+		assert.NoError(err)
+		assert.True(len(source.Schedules) > 0)
+
+		schedule := &Schedule{
+			Id:       source.Schedules[0].Id,
+			SourceId: source.Schedules[0].SourceId,
+			Day:      Weekday,
+			Time:     "09:30",
+		}
+
+		output, err := db.UpdateSchedule(schedule)
+		assert.NoError(err)
+		assert.Equal(output, schedule)
+	})
+}
+
+func seedSchedules(db *Postgres) error {
+	sources, err := db.GetSources(nil)
+	if err != nil {
+		return err
+	}
+
+	// Every source will get (id - 1) * 2 schedules for Everyday. The time will be the (current time + index * 5 minute)
+	for _, source := range sources {
+		if source.Id == 1 {
+			continue
+		}
+
+		for j := 0; j < (source.Id-1)*2; j++ {
+			t := time.Now().Add(time.Duration(5*j) * time.Minute).Format("15:04")
+			schedule, err := NewSchedule(source.Id, Everyday, t)
+			if err != nil {
+				return err
+			}
+			if _, err := db.AddSchedule(schedule); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
