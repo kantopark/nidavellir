@@ -27,8 +27,7 @@ func (m *MockJobStore) GetJobs(_ *store.ListJobOption) ([]*store.Job, error) {
 	return jobs, nil
 }
 
-type MockFileHandler struct {
-}
+type MockFileHandler struct{}
 
 func (m *MockFileHandler) GetAll(sourceId, jobId int) (logs, imageLogs string, files []string, err error) {
 	logs, _ = m.GetLogContent(sourceId, jobId)
@@ -47,4 +46,19 @@ func (m *MockFileHandler) GetLogContent(_, _ int) (string, error) {
 
 func (m *MockFileHandler) GetOutputFileList(_, _ int) ([]string, error) {
 	return []string{"file1", "file2"}, nil
+}
+
+type MockJobScheduler struct{}
+
+func (m *MockJobScheduler) AddJob(sourceId int, _ string) error {
+	if sourceId == 0 {
+		return errors.New("mock error")
+	}
+	return nil
+}
+
+func (m *MockJobScheduler) Start() {
+}
+
+func (m *MockJobScheduler) Close() {
 }

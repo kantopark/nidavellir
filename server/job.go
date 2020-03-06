@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"nidavellir/libs"
+	"nidavellir/services/scheduler"
 	"nidavellir/services/store"
 )
 
@@ -26,8 +27,9 @@ type JobInfo struct {
 }
 
 type JobHandler struct {
-	DB    IJobStore
-	Files IFileHandler
+	DB        IJobStore
+	Files     IFileHandler
+	Scheduler scheduler.IScheduler
 }
 
 func (j *JobHandler) GetJobs() http.HandlerFunc {
@@ -98,5 +100,24 @@ func (j *JobHandler) GetJobInfo() http.HandlerFunc {
 		}
 
 		toJson(w, info)
+	}
+}
+
+// Inserts a job to the top of the queue
+func (j *JobHandler) InsertJob() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sourceId, err := strconv.Atoi(chi.URLParam(r, "sourceId"))
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		err = j.Scheduler.AddJob(sourceId, store.TriggerManual)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		ok(w)
 	}
 }

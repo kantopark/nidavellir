@@ -15,7 +15,7 @@ import (
 
 func NewJobHandler() *JobHandler {
 	jobMap := make(map[int]*store.Job)
-	startTime := time.Date(2020, 1, 2, 9, 30, 0, 0, time.UTC)
+	startTime := time.Date(2020, 1, 2, 9, 30, 0, 0, time.Local)
 	states := []string{store.JobQueued, store.JobQueued, store.JobQueued, store.JobRunning, store.JobSuccess,
 		store.JobFailure, store.JobQueued, store.JobRunning, store.JobSuccess}
 
@@ -33,8 +33,9 @@ func NewJobHandler() *JobHandler {
 	}
 
 	return &JobHandler{
-		DB:    &MockJobStore{db: jobMap},
-		Files: &MockFileHandler{},
+		DB:        &MockJobStore{db: jobMap},
+		Files:     &MockFileHandler{},
+		Scheduler: &MockJobScheduler{},
 	}
 }
 
@@ -96,4 +97,16 @@ func TestJobHandler_GetJobInfo(t *testing.T) {
 			assert.IsType(&JobInfo{}, info)
 		}
 	}
+}
+
+func TestJobHandler_InsertJob(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+	handler := NewJobHandler()
+
+	w := httptest.NewRecorder()
+	r := NewTestRequest("POST", "/trigger", nil, map[string]string{"sourceId": "1"})
+
+	handler.InsertJob()(w, r)
+	assert.Equal(http.StatusOK, w.Code)
 }
