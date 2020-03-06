@@ -31,6 +31,8 @@ type JobManager struct {
 
 // The manager holds a queue of job. Whenever there are new jobs, it will dispatch
 // the job. At any one time, it can only run one job. Thus the jobs are queued.
+// You should not be creating a JobManager, but should call NewScheduler which will
+// create a JobManager internally.
 func NewJobManager(db IStore, appFolderPath string) (*JobManager, error) {
 	if !libs.PathExists(appFolderPath) {
 		err := os.MkdirAll(appFolderPath, 0777)
@@ -228,11 +230,11 @@ func (m *JobManager) failWork(source *store.Source, job *store.Job) error {
 
 // Updates the job status
 func (m *JobManager) updateJobAndSourceStatus(source *store.Source, job *store.Job) error {
-	if _, err := m.db.UpdateJob(*job); err != nil {
+	if _, err := m.db.UpdateJob(job); err != nil {
 		return errors.Wrap(err, "could not update job status")
 	}
 
-	if _, err := m.db.UpdateSource(*source); err != nil {
+	if _, err := m.db.UpdateSource(source); err != nil {
 		return errors.Wrap(err, "could not update source status")
 	}
 

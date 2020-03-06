@@ -14,12 +14,17 @@ type Scheduler struct {
 	ctx        context.Context
 	err        chan error
 	store      IStore
-	manager    IManager
+	manager    *JobManager
 }
 
 // Scheduler pings the database at fixed interval to look for new jobs
 // If there are, it will push the job into the manager
-func NewScheduler(db IStore, manager IManager) *Scheduler {
+func NewScheduler(db IStore, appFolderPath string) (*Scheduler, error) {
+	manager, err := NewJobManager(db, appFolderPath)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	s := &Scheduler{
 		cancelFunc: cancelFunc,
@@ -29,9 +34,7 @@ func NewScheduler(db IStore, manager IManager) *Scheduler {
 		store:      db,
 	}
 
-	go s.fetchAndQueueJobs()
-
-	return s
+	return s, nil
 }
 
 func (s *Scheduler) Errors() <-chan error {
@@ -40,10 +43,12 @@ func (s *Scheduler) Errors() <-chan error {
 
 func (s *Scheduler) Close() {
 	s.cancelFunc()
+	s.manager.Close()
 }
 
 // fetches eligible jobs and puts them in the job queue
-func (s *Scheduler) fetchAndQueueJobs() {
+func (s *Scheduler) Start() {
+	s.manager.Start()
 	ticker := time.NewTicker(10 * time.Second)
 
 	for {
@@ -61,7 +66,6 @@ func (s *Scheduler) fetchAndQueueJobs() {
 			for _, t := range todos {
 				if err := s.manager.AddJob(t, store.TriggerSchedule); err != nil {
 					s.err <- errors.Wrap(err, "could not add new job")
-					continue
 				}
 			}
 
@@ -69,4 +73,13 @@ func (s *Scheduler) fetchAndQueueJobs() {
 			return
 		}
 	}
+}
+
+// Adds a job to the JobManager
+func (s *Scheduler) AddJob(sourceId int, trigger string) error {
+	source, err := s.store.GetSource(sourceId)
+	if err != nil {
+		return errors.Wrapf(err, "Could not get sou")
+	}
+	return s.manager.AddJob(source, trigger)
 }
