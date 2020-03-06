@@ -1,7 +1,6 @@
 package store_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/dhui/dktest"
@@ -46,11 +45,11 @@ func TestPostgres_GetSecrets(t *testing.T) {
 		db, err := newTestDb(info, seedSources, seedSecrets)
 		assert.NoError(err)
 
-		sourceId := 2
+		sourceId := 1
 		secrets, err := db.GetSecrets(sourceId)
 
 		assert.NoError(err)
-		assert.Len(secrets, (sourceId-1)*2)
+		assert.Len(secrets, 1)
 	})
 }
 
@@ -90,7 +89,7 @@ func TestPostgres_RemoveSecret(t *testing.T) {
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
-		db, err := newTestDb(info, seedSources, seedSecrets)
+		db, err := newTestDb(info, seedSources)
 		assert.NoError(err)
 
 		err = db.RemoveSecret(1)
@@ -99,27 +98,11 @@ func TestPostgres_RemoveSecret(t *testing.T) {
 }
 
 func seedSecrets(db *Postgres) error {
-	sources, err := db.GetSources(nil)
+	// seed secret to first source
+	secret, err := NewSecret(1, "key", "value")
 	if err != nil {
 		return err
 	}
-
-	// Every source will get (id - 1) * 2 secrets. Thus for id==1, it gets 0 secrets
-	for _, source := range sources {
-		if source.Id == 1 {
-			continue
-		}
-
-		for j := 0; j < (source.Id-1)*2; j++ {
-			secret, err := NewSecret(source.Id, fmt.Sprintf("key-%d", j), fmt.Sprintf("value-%d", j))
-			if err != nil {
-				return err
-			}
-			if _, err := db.AddSecret(secret); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+	_, err = db.AddSecret(secret)
+	return err
 }

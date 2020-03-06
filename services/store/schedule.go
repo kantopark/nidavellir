@@ -201,7 +201,7 @@ func (p *Postgres) UpdateSchedule(schedule *Schedule) (*Schedule, error) {
 
 // Removes a schedule. The id will uniquely identify the schedule
 func (p *Postgres) RemoveSchedule(id int) error {
-	var s *Schedule
+	var s Schedule
 	if err := p.db.First(&s, "id = ?", id).Error; err != nil {
 		return errors.Wrapf(err, "could not get schedule with id: %d", id)
 	}

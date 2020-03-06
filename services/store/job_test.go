@@ -56,13 +56,13 @@ func TestPostgres_GetJobs(t *testing.T) {
 
 		jobs, err := db.GetJobs(nil)
 		assert.NoError(err)
-		assert.Len(jobs, 2)
+		assert.Len(jobs, 4)
 
 		jobs, err = db.GetJobs(&ListJobOption{
 			Trigger: TriggerSchedule,
 		})
 		assert.NoError(err)
-		assert.Len(jobs, 1)
+		assert.NotEmpty(jobs)
 
 		jobs, err = db.GetJobs(&ListJobOption{
 			SourceId: 1,
@@ -74,7 +74,7 @@ func TestPostgres_GetJobs(t *testing.T) {
 			State: []string{JobQueued},
 		})
 		assert.NoError(err)
-		assert.Len(jobs, 2)
+		assert.Len(jobs, 4)
 	})
 }
 
@@ -89,7 +89,7 @@ func TestPostgres_UpdateJob(t *testing.T) {
 
 		jobs, err := db.GetJobs(nil)
 		assert.NoError(err)
-		assert.Len(jobs, 2)
+		assert.Len(jobs, 4)
 
 		job := jobs[0]
 		err = job.ToStartState()

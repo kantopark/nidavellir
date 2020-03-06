@@ -27,7 +27,7 @@ type Source struct {
 	Schedules  []Schedule `json:"schedules"`
 }
 
-func NewSource(name, repoUrl string, startTime time.Time) (s *Source, err error) {
+func NewSource(name, repoUrl string, startTime time.Time, secrets []Secret, schedules []Schedule) (s *Source, err error) {
 	name = strings.TrimSpace(name)
 
 	s = &Source{
@@ -36,6 +36,8 @@ func NewSource(name, repoUrl string, startTime time.Time) (s *Source, err error)
 		RepoUrl:    repoUrl,
 		State:      ScheduleNoop,
 		NextTime:   startTime,
+		Secrets:    secrets,
+		Schedules:  schedules,
 	}
 
 	if err := s.Validate(); err != nil {

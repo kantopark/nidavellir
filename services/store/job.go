@@ -83,7 +83,7 @@ func (p *Postgres) AddJob(sourceId int, trigger string) (*Job, error) {
 
 // Updates the details of the job. Must have the id specified
 func (p *Postgres) UpdateJob(job *Job) (*Job, error) {
-	if job.Id <= 0 {
+	if job.Id == 0 {
 		return nil, errors.New("job id must be specified")
 	}
 
