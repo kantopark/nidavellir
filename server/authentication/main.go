@@ -24,11 +24,13 @@ type authenticator struct {
 }
 
 func New(db IStore, adminOnly bool, configs ...config.AuthConfig) func(http.Handler) http.Handler {
-	return authenticator{
+	auth := &authenticator{
 		adminOnly: adminOnly,
 		configs:   configs,
 		db:        db,
-	}.Next()
+	}
+
+	return auth.Next()
 }
 
 func (a *authenticator) Next() func(http.Handler) http.Handler {

@@ -50,6 +50,10 @@ func (m *MockFileHandler) GetOutputFileList(_, _ int) ([]string, error) {
 
 type MockJobScheduler struct{}
 
+func (m *MockJobScheduler) Errors() []error {
+	return nil
+}
+
 func (m *MockJobScheduler) AddJob(sourceId int, _ string) error {
 	if sourceId == 0 {
 		return errors.New("mock error")

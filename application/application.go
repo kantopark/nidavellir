@@ -15,13 +15,13 @@ import (
 )
 
 type App struct {
-	closeCh chan struct{}
-	manager *scheduler.JobManager
-	server  *http.Server
-	conf    *config.Config
+	closeCh   chan struct{}
+	scheduler scheduler.IScheduler
+	server    *http.Server
+	conf      *config.Config
 }
 
-func New(server *http.Server, store *store.Postgres, manager *scheduler.JobManager, conf *config.Config) (*App, error) {
+func New(server *http.Server, store *store.Postgres, manager scheduler.IScheduler, conf *config.Config) (*App, error) {
 	setLogger()
 	if err := store.Migrate(); err != nil {
 		return nil, err
@@ -32,16 +32,16 @@ func New(server *http.Server, store *store.Postgres, manager *scheduler.JobManag
 	}
 
 	return &App{
-		closeCh: make(chan struct{}),
-		manager: manager,
-		server:  server,
-		conf:    conf,
+		closeCh:   make(chan struct{}),
+		scheduler: manager,
+		server:    server,
+		conf:      conf,
 	}, nil
 }
 
 func (a *App) Run() {
 	go a.shutdownListener()
-	go a.manager.Start()
+	go a.scheduler.Start()
 	a.runServer()
 	<-a.closeCh
 }
@@ -72,8 +72,8 @@ func (a *App) shutdownListener() {
 		log.WithField("cause", err).Error("error shutting down application server")
 	}
 
-	log.Info("Shutting down job manager")
-	a.manager.Close()
+	log.Info("Shutting down job scheduler")
+	a.scheduler.Close()
 
 	close(a.closeCh)
 }
