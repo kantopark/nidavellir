@@ -33,4 +33,7 @@ type IScheduler interface {
 
 	// Stops the job
 	Close()
+
+	// List all errors
+	Errors() []error
 }

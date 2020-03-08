@@ -1,6 +1,8 @@
 package scheduler_test
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"strconv"
@@ -22,6 +24,8 @@ type mockStore struct {
 }
 
 func newMockStore() *mockStore {
+	now := time.Now()
+
 	return &mockStore{
 		sources: map[int]*store.Source{
 			1: {
@@ -31,13 +35,11 @@ func newMockStore() *mockStore {
 				RepoUrl:    pythonRepo.Source,
 				State:      store.ScheduleNoop,
 				NextTime:   time.Now(),
+				CronExpr:   fmt.Sprintf("0 %d %d * * * *", now.Minute(), now.Hour()),
 				Secrets: []store.Secret{
 					{Key: "POSTGRES_USER", Value: user},
 					{Key: "POSTGRES_PASSWORD", Value: password},
 					{Key: "POSTGRES_DB", Value: dbName},
-				},
-				Schedules: []store.Schedule{
-					{1, 1, store.Everyday, time.Now().Add(5 * time.Second).Format("15:04")},
 				},
 			},
 		},
@@ -58,9 +60,9 @@ func (m mockStore) GetSource(id int) (*store.Source, error) {
 	return m.sources[id], nil
 }
 
-func (m mockStore) UpdateSource(source store.Source) (*store.Source, error) {
-	m.sources[source.Id] = &source
-	return &source, nil
+func (m mockStore) UpdateSource(source *store.Source) (*store.Source, error) {
+	m.sources[source.Id] = source
+	return source, nil
 }
 
 func (m mockStore) AddJob(sourceId int, trigger string) (*store.Job, error) {
@@ -87,15 +89,15 @@ func (m mockStore) GetJob(id int) (*store.Job, error) {
 	}
 }
 
-func (m mockStore) UpdateJob(job store.Job) (*store.Job, error) {
-	m.jobs[job.Id] = &job
-	return &job, nil
+func (m mockStore) UpdateJob(job *store.Job) (*store.Job, error) {
+	m.jobs[job.Id] = job
+	return job, nil
 }
 
 func TestNewJobManager(t *testing.T) {
 	assert := require.New(t)
 	db := newMockStore()
-	manager, err := NewJobManager(db, appDir)
+	manager, err := NewJobManager(db, context.Background(), appDir)
 	assert.NoError(err)
 
 	manager.Start()
@@ -108,7 +110,7 @@ func TestNewJobManager(t *testing.T) {
 			store.Secret{Key: "POSTGRES_HOST", Value: "172.17.0.1"},
 			store.Secret{Key: "POSTGRES_PORT", Value: port},
 		)
-		_, _ = db.UpdateSource(*source)
+		_, _ = db.UpdateSource(source)
 
 		err = manager.AddJob(source, store.TriggerSchedule)
 		assert.NoError(err)
@@ -136,7 +138,7 @@ func TestNewJobManager(t *testing.T) {
 func TestNewJobManager_NoTimeOut(t *testing.T) {
 	assert := require.New(t)
 	db := newMockStore()
-	manager, err := NewJobManager(db, appDir)
+	manager, err := NewJobManager(db, context.Background(), appDir)
 	assert.NoError(err)
 
 	manager.Start()
@@ -149,7 +151,7 @@ func TestNewJobManager_NoTimeOut(t *testing.T) {
 			store.Secret{Key: "POSTGRES_HOST", Value: "172.17.0.1"},
 			store.Secret{Key: "POSTGRES_PORT", Value: port},
 		)
-		_, _ = db.UpdateSource(*source)
+		_, _ = db.UpdateSource(source)
 
 		err = manager.AddJob(source, store.TriggerSchedule)
 		assert.NoError(err)

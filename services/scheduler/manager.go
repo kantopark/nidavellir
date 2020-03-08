@@ -19,8 +19,8 @@ import (
 
 type JobManager struct {
 	ctx     context.Context
-	cancel  context.CancelFunc
 	db      IStore
+	errs    chan error
 	queue   *JobQueue
 	started bool
 	// An array of completed jobs by the manager, this is primarily used for testing purposes
@@ -33,7 +33,7 @@ type JobManager struct {
 // the job. At any one time, it can only run one job. Thus the jobs are queued.
 // You should not be creating a JobManager, but should call NewScheduler which will
 // create a JobManager internally.
-func NewJobManager(db IStore, appFolderPath string) (*JobManager, error) {
+func NewJobManager(db IStore, ctx context.Context, appFolderPath string) (*JobManager, error) {
 	if !libs.PathExists(appFolderPath) {
 		err := os.MkdirAll(appFolderPath, 0777)
 		if err != nil {
@@ -42,8 +42,10 @@ func NewJobManager(db IStore, appFolderPath string) (*JobManager, error) {
 	}
 
 	return &JobManager{
-		queue:         NewJobQueue(),
+		ctx:           ctx,
 		db:            db,
+		errs:          make(chan error),
+		queue:         NewJobQueue(),
 		started:       false,
 		CompletedJobs: []int{},
 		AppFolderPath: appFolderPath,
@@ -53,19 +55,29 @@ func NewJobManager(db IStore, appFolderPath string) (*JobManager, error) {
 // Starts watching for jobs and executing work
 func (m *JobManager) Start() {
 	if !m.started {
-		ctx, cancel := context.WithCancel(context.Background())
 		m.started = true
-		m.ctx = ctx
-		m.cancel = cancel
-		go m.dispatchWork()
+		go m.searchForWork()
+		go m.dispatchJobs()
 	}
+}
+
+// Returns all errors from the JobManager. This will clean up errors in the channel
+// which means that only "new" errors are seen
+func (m *JobManager) Errors() []error {
+	close(m.errs)
+	var errs []error
+	for err := range m.errs {
+		errs = append(errs, err)
+	}
+
+	m.errs = make(chan error)
+	return errs
 }
 
 // Stops all job and the job manager.
 func (m *JobManager) Close() {
 	if m.started {
 		m.started = false
-		m.cancel()
 	}
 }
 
@@ -101,8 +113,36 @@ func (m *JobManager) AddJob(source *store.Source, trigger string) error {
 	return nil
 }
 
-// starts dispatching work
-func (m *JobManager) dispatchWork() {
+// Looks for new job every 10 seconds. If there are any, inserts them into the JobQueue
+func (m *JobManager) searchForWork() {
+	ticker := time.NewTicker(10 * time.Second)
+
+	for {
+		select {
+		case <-ticker.C:
+			todos, err := m.db.GetSources(&store.GetSourceOption{
+				ScheduledToRun: true,
+				MaskSecrets:    false,
+			})
+			if err != nil {
+				m.errs <- errors.Wrap(err, "could not fetch sources in scheduler")
+				continue
+			}
+
+			for _, t := range todos {
+				if err := m.AddJob(t, store.TriggerSchedule); err != nil {
+					m.errs <- errors.Wrap(err, "could not add new job")
+				}
+			}
+
+		case <-m.ctx.Done():
+			return
+		}
+	}
+}
+
+// Dispatches any job from the jobQueue if any
+func (m *JobManager) dispatchJobs() {
 	ch := make(chan bool, 1)
 	ticker := time.NewTicker(5 * time.Second)
 
