@@ -17,9 +17,9 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	systemCheck()
-	dbOption, cleanUp := startDb()
-	defer cleanUp()
+	sys := NewSystem(conf)
+	dbOption := sys.Initialize()
+	defer sys.CleanUp()
 
 	db, err := store.New(dbOption)
 	if err != nil {
