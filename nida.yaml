@@ -4,7 +4,7 @@
 # account has the ability to create and remove any subsequent accounts
 account:
   username: admin
-  password: password  # change this with the environment variable nida_admin.username
+  password: password  # change this with the environment variable nida_admin.password
 
 app:
   # working directory, leave this empty to use the default working directory
@@ -17,6 +17,19 @@ app:
     certfile: ""
   # port that the server app runs on
   port: 7050
+
+# additional authorization plugins. Presently, the supported types are JWT and BASIC.
+# Nidavellir's BASIC auth uses accounts that are managed in Nidavellir's own database.
+# JWT auth uses an external signing server but verifies using the publicKey key in the
+# info map. Authentication is a list of AuthConfig objects where the extra information
+# are stored in the info map.
+auth:
+  - type: BASIC
+  - type: JWT
+    info:
+      # path to public key file for decoding/validating the jwt
+      publicKey: /path/to/public/key
+
 
 # container run and build configuration
 run:

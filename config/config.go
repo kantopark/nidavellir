@@ -13,6 +13,7 @@ type Config struct {
 	Acct accountConfig `mapstructure:"account"`
 	App  appConfig     `mapstructure:"app"`
 	Run  runConfig     `mapstructure:"run"`
+	Auth []AuthConfig  `mapstructure:"auth"`
 }
 
 type IValidate interface {
