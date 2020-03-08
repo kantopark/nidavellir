@@ -3,6 +3,8 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"os/exec"
+	"strings"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -13,6 +15,31 @@ import (
 	"nidavellir/server/authentication"
 	"nidavellir/services/scheduler"
 )
+
+var version string
+
+func init() {
+	format := func(v []byte) string {
+		return strings.TrimSpace(string(v[:]))
+	}
+	// determines the version
+	_, err := exec.LookPath("git")
+	if err != nil {
+		version = "Unknown"
+	} else {
+		output, err := exec.Command("git", "describe", "--abbrev=0", "--tags").CombinedOutput()
+		if err != nil {
+			output, err = exec.Command("git", "rev-parse", "HEAD").CombinedOutput()
+			if err != nil {
+				version = "Unknown"
+			} else {
+				version = format(output)
+			}
+		} else {
+			version = format(output)
+		}
+	}
+}
 
 type IStore interface {
 	ISourceStore
@@ -53,7 +80,7 @@ func attachHandlers(r *chi.Mux, store IStore, scheduler scheduler.IScheduler, co
 		return err
 	}
 
-	r.Get("/health-check", HealthCheck)
+	r.Get("/healthcheck", HealthCheck)
 
 	// Private APIs
 	r.Route("/api", func(r chi.Router) {
@@ -107,5 +134,8 @@ func attachHandlers(r *chi.Mux, store IStore, scheduler scheduler.IScheduler, co
 }
 
 func HealthCheck(w http.ResponseWriter, _ *http.Request) {
-	ok(w)
+	toJson(w, struct {
+		Status  string `json:"status"`
+		Version string `json:"version"`
+	}{"Okay", version})
 }
