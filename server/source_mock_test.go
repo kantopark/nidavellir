@@ -106,24 +106,3 @@ func (m *MockSourceStore) RemoveSecret(id int) error {
 	}
 	return nil
 }
-
-func (m *MockSourceStore) AddSchedule(schedule *store.Schedule) (*store.Schedule, error) {
-	if schedule.SourceId == 0 {
-		return nil, errors.New("mock error")
-	}
-	return schedule, nil
-}
-
-func (m *MockSourceStore) UpdateSchedule(schedule *store.Schedule) (*store.Schedule, error) {
-	if schedule.SourceId == 0 {
-		return nil, errors.New("mock error")
-	}
-	return schedule, nil
-}
-
-func (m *MockSourceStore) RemoveSchedule(id int) error {
-	if id == 0 {
-		return errors.New("mock error")
-	}
-	return nil
-}

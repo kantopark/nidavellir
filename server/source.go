@@ -21,10 +21,6 @@ type ISourceStore interface {
 	UpdateSecret(secret *store.Secret) (*store.Secret, error)
 	RemoveSecret(id int) error
 	AddSecret(secret *store.Secret) (*store.Secret, error)
-
-	AddSchedule(schedule *store.Schedule) (*store.Schedule, error)
-	UpdateSchedule(schedule *store.Schedule) (*store.Schedule, error)
-	RemoveSchedule(id int) error
 }
 
 type SourceHandler struct {
@@ -181,68 +177,6 @@ func (s *SourceHandler) DeleteSecret() http.HandlerFunc {
 		err = s.DB.RemoveSecret(id)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
-			return
-		}
-
-		ok(w)
-	}
-}
-
-func (s *SourceHandler) AddSchedule() http.HandlerFunc {
-	return s.createAddUpdateScheduleHandler(true)
-}
-
-func (s *SourceHandler) UpdateSchedule() http.HandlerFunc {
-	return s.createAddUpdateScheduleHandler(false)
-}
-
-func (s *SourceHandler) createAddUpdateScheduleHandler(isCreate bool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		sourceId, err := strconv.Atoi(chi.URLParam(r, "sourceId"))
-		if err != nil {
-			http.Error(w, errors.Wrap(err, "invalid source id").Error(), 400)
-			return
-		}
-
-		var schedule *store.Schedule
-		err = readJson(r, &schedule)
-		if err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-		schedule.SourceId = sourceId
-
-		if isCreate {
-			schedule, err = s.DB.AddSchedule(schedule)
-		} else {
-			schedule, err = s.DB.UpdateSchedule(schedule)
-		}
-
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		toJson(w, schedule)
-	}
-}
-
-func (s *SourceHandler) DeleteSchedule() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		_, err := strconv.Atoi(chi.URLParam(r, "sourceId"))
-		if err != nil {
-			http.Error(w, errors.Wrap(err, "invalid source id").Error(), 400)
-			return
-		}
-
-		id, err := strconv.Atoi(chi.URLParam(r, "id"))
-		if err != nil {
-			http.Error(w, errors.Wrap(err, "invalid schedule id").Error(), 400)
-			return
-		}
-
-		err = s.DB.RemoveSchedule(id)
-		if err != nil {
-			http.Error(w, err.Error(), 400)
 			return
 		}
 

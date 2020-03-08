@@ -22,16 +22,9 @@ func NewSourceHandler() *SourceHandler {
 			Name:       "Source1",
 			UniqueName: "source1",
 			RepoUrl:    "http://github.com/somewhere/source1",
-			Schedules: []store.Schedule{
-				{
-					Id:       1,
-					SourceId: 1,
-					Day:      "EVERYDAY",
-					Time:     time.Now().Add(5 * time.Second).Format("15:04"),
-				},
-			},
-			State:    store.ScheduleNoop,
-			NextTime: time.Now(),
+			CronExpr:   "0 0 0 * * * *",
+			State:      store.ScheduleNoop,
+			NextTime:   time.Now(),
 			Secrets: []store.Secret{
 				{
 					Id:       1,
@@ -313,85 +306,6 @@ func TestSourceHandler_DeleteSecret(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := NewTestRequest("DELETE", "/", nil, map[string]string{"sourceId": "1", "id": strconv.Itoa(test.Id)})
 		handler.DeleteSecret()(w, r)
-		assert.Equal(test.StatusCode, w.Code)
-	}
-}
-
-func TestSourceHandler_AddSchedule(t *testing.T) {
-	t.Parallel()
-	assert := require.New(t)
-	handler := NewSourceHandler()
-
-	for _, test := range []struct {
-		SourceId   int
-		StatusCode int
-	}{
-		{1, http.StatusOK},
-		{0, http.StatusInternalServerError},
-	} {
-		r := NewTestRequest("POST", "/", strings.NewReader(`{
-"source_id": 0,
-"day": "Everyday",
-"time": "09:30"
-}`), map[string]string{"sourceId": strconv.Itoa(test.SourceId)})
-		w := httptest.NewRecorder()
-		handler.AddSchedule()(w, r)
-		assert.Equal(test.StatusCode, w.Code)
-
-		if test.StatusCode == http.StatusOK {
-			var schedule *store.Schedule
-			err := readJson(w, &schedule)
-			assert.NoError(err)
-			assert.IsType(&store.Schedule{}, schedule)
-		}
-	}
-}
-
-func TestSourceHandler_UpdateSchedule(t *testing.T) {
-	t.Parallel()
-	assert := require.New(t)
-	handler := NewSourceHandler()
-
-	for _, test := range []struct {
-		SourceId   int
-		StatusCode int
-	}{
-		{1, http.StatusOK},
-		{0, http.StatusInternalServerError},
-	} {
-		r := NewTestRequest("PUT", "/", strings.NewReader(`{
-"source_id": 0,
-"day": "Everyday",
-"time": "09:30"
-}`), map[string]string{"sourceId": strconv.Itoa(test.SourceId)})
-		w := httptest.NewRecorder()
-		handler.UpdateSchedule()(w, r)
-		assert.Equal(test.StatusCode, w.Code)
-
-		if test.StatusCode == http.StatusOK {
-			var schedule *store.Schedule
-			err := readJson(w, &schedule)
-			assert.NoError(err)
-			assert.IsType(&store.Schedule{}, schedule)
-		}
-	}
-}
-
-func TestSourceHandler_RemoveSchedule(t *testing.T) {
-	t.Parallel()
-	assert := require.New(t)
-	handler := NewSourceHandler()
-
-	for _, test := range []struct {
-		Id         int
-		StatusCode int
-	}{
-		{1, http.StatusOK},
-		{0, http.StatusBadRequest},
-	} {
-		w := httptest.NewRecorder()
-		r := NewTestRequest("DELETE", "/", nil, map[string]string{"sourceId": "1", "id": strconv.Itoa(test.Id)})
-		handler.DeleteSchedule()(w, r)
 		assert.Equal(test.StatusCode, w.Code)
 	}
 }
