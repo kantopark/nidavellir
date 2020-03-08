@@ -211,20 +211,18 @@ func TestSourceHandler_DeleteSource(t *testing.T) {
 	tests := []struct {
 		Id         string
 		StatusCode int
-		Type       interface{}
 	}{
-		{"1", http.StatusOK, &store.Source{}},
-		{"2", http.StatusBadRequest, nil},
+		{"1", http.StatusOK},
+		{"2", http.StatusBadRequest},
 	}
 
 	for _, test := range tests {
 		w := httptest.NewRecorder()
-		r := NewTestRequest("PUT", "/", nil, map[string]string{"id": test.Id})
+		r := NewTestRequest("DELETE", "/", nil, map[string]string{"id": test.Id})
 
 		handler.DeleteSource()(w, r)
 		assert.Equal(test.StatusCode, w.Code)
 	}
-
 }
 
 func TestSourceHandler_AddSecret(t *testing.T) {

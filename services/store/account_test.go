@@ -180,6 +180,25 @@ func TestPostgres_UpdateAccount(t *testing.T) {
 	})
 }
 
+func TestPostgres_IsLastAdmin(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		db, err := newTestDb(info, seedAccounts)
+		assert.NoError(err)
+
+		isLastAdmin, err := db.IsLastAdmin(1)
+		assert.NoError(err)
+		assert.True(isLastAdmin)
+
+		// Not admin at all
+		isLastAdmin, err = db.IsLastAdmin(2)
+		assert.NoError(err)
+		assert.False(isLastAdmin)
+	})
+}
+
 func newAccounts() ([]*Account, error) {
 	var accounts []*Account
 

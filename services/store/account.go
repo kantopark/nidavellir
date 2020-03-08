@@ -141,3 +141,20 @@ func (p *Postgres) RemoveAccount(id int) error {
 
 	return nil
 }
+
+// Checks if the account specified by the id is the last admin. Usually, this method is used to ensure that
+// we do not remove the last admin account
+func (p *Postgres) IsLastAdmin(id int) (bool, error) {
+	a, err := p.getAccountById(id)
+	if err != nil {
+		return false, err
+	} else if !a.IsAdmin {
+		return false, nil
+	}
+
+	var numAdmin int
+	if err := p.db.Model(&Account{}).Where("is_admin = ?", true).Count(&numAdmin).Error; err != nil {
+		return false, err
+	}
+	return numAdmin == 1, nil
+}
