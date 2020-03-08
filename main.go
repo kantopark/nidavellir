@@ -26,13 +26,17 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	manager, err := scheduler.NewJobManager(db, conf.App.WorkDir)
-	srv, err := server.New(conf.App.Port, db, conf)
+	sch, err := scheduler.NewScheduler(db, conf.App.WorkDir)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	app, err := application.New(srv, db, manager, conf)
+	srv, err := server.New(conf.App.Port, db, sch, conf)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	app, err := application.New(srv, db, sch, conf)
 	if err != nil {
 		log.Fatalln(err)
 	}

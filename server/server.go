@@ -1,9 +1,7 @@
 package server
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -12,17 +10,20 @@ import (
 	"github.com/rs/cors"
 
 	"nidavellir/config"
+	"nidavellir/server/authentication"
+	"nidavellir/services/scheduler"
 )
 
 type IStore interface {
 	ISourceStore
 	IJobStore
+	IAccountStore
 }
 
-func New(port int, store IStore, conf *config.Config) (*http.Server, error) {
+func New(port int, store IStore, scheduler scheduler.IScheduler, conf *config.Config) (*http.Server, error) {
 	r := chi.NewRouter()
 	attachMiddleware(r)
-	err := attachHandlers(r, store, conf)
+	err := attachHandlers(r, store, scheduler, conf)
 	if err != nil {
 		return nil, errors.Wrap(err, "error attaching route handlers to http.Server")
 	}
@@ -46,7 +47,7 @@ func attachMiddleware(r *chi.Mux) {
 	}).Handler)
 }
 
-func attachHandlers(r *chi.Mux, store IStore, conf *config.Config) error {
+func attachHandlers(r *chi.Mux, store IStore, scheduler scheduler.IScheduler, conf *config.Config) error {
 	fileHandler, err := newFileHandler(conf.App.WorkDir)
 	if err != nil {
 		return err
@@ -54,10 +55,13 @@ func attachHandlers(r *chi.Mux, store IStore, conf *config.Config) error {
 
 	r.Get("/health-check", HealthCheck)
 
+	// Private APIs
 	r.Route("/api", func(r chi.Router) {
-		r.Use(Authenticator)
+		// Non-public api protector, auth middleware will drop any unauthorized access
 		r.Route("/source", func(r chi.Router) {
+			r.Use(authentication.New(store, false, conf.Auth...))
 			handler := SourceHandler{DB: store}
+
 			r.Get("/", handler.GetSources())
 			r.Get("/{id}", handler.GetSource())
 			r.Post("/", handler.CreateSource())
@@ -71,30 +75,35 @@ func attachHandlers(r *chi.Mux, store IStore, conf *config.Config) error {
 		})
 
 		r.Route("/job", func(r chi.Router) {
-			handler := JobHandler{DB: store, Files: fileHandler}
+			r.Use(authentication.New(store, false, conf.Auth...))
+			handler := JobHandler{DB: store, Files: fileHandler, Scheduler: scheduler}
+
 			r.Get("/", handler.GetJobs())
 			r.Get("/{id}", handler.GetJobInfo())
+			r.Get("/trigger/{sourceId}", handler.InsertJob())
+		})
+
+		r.Route("/account", func(r chi.Router) {
+			r.Use(authentication.New(store, false, config.BasicAuth))
+			handler := AccountHandler{DB: store}
+
+			r.Put("/", handler.UpdateAccount())
+			r.Post("/", handler.AddAccount())
+			r.Delete("/{id}", handler.RemoveAccount())
 		})
 	})
 
+	// Public APIs
+	r.Route("/public-api", func(r chi.Router) {
+		r.Route("/account", func(r chi.Router) {
+			handler := AccountHandler{DB: store}
+			r.Post("/", handler.ValidateAccount())
+		})
+	})
+
+	// TODO add file exposer
+
 	return nil
-}
-
-func Authenticator(next http.Handler) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		username, password, ok := r.BasicAuth()
-		if !ok {
-			log.Println("Could not get authentication credentials")
-		} else {
-			// TODO add database call here
-			context.WithValue(ctx, "username", username)
-			context.WithValue(ctx, "password", password)
-		}
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	}
-	return http.HandlerFunc(fn)
 }
 
 func HealthCheck(w http.ResponseWriter, _ *http.Request) {
