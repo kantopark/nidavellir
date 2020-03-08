@@ -13,11 +13,11 @@ type Account struct {
 	IsAdmin  bool   `json:"isAdmin"`
 }
 
-func NewAccount(username, password string) (*Account, error) {
+func NewAccount(username, password string, isAdmin bool) (*Account, error) {
 	u := &Account{
 		Username: username,
 		Password: password,
-		IsAdmin:  false,
+		IsAdmin:  isAdmin,
 	}
 
 	if err := u.Validate(); err != nil {
@@ -28,8 +28,12 @@ func NewAccount(username, password string) (*Account, error) {
 }
 
 func (u *Account) Validate() error {
-	if libs.IsEmptyOrWhitespace(u.Username) || libs.IsEmptyOrWhitespace(u.Password) {
-		return errors.New("username or password cannot be empty")
+	if libs.IsEmptyOrWhitespace(u.Username) {
+		return errors.New("username cannot be empty")
+	}
+
+	if u.IsAdmin && libs.IsEmptyOrWhitespace(u.Password) {
+		return errors.New("password cannot be empty for admin accounts")
 	}
 
 	return nil

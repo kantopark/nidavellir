@@ -20,12 +20,13 @@ func TestNewAccount(t *testing.T) {
 		HasError bool
 	}{
 		{"username", "password", false, false},
-		{"123  ", "", false, true},
-		{"", "", false, true},
+		{"username", "", false, false},
+		{"username", "", true, true},
+		{"", "password", false, true},
 	}
 
 	for _, test := range tests {
-		u, err := NewAccount(test.Username, test.Password)
+		u, err := NewAccount(test.Username, test.Password, test.IsAdmin)
 		if test.HasError {
 			assert.Error(err)
 			assert.Nil(u)
@@ -38,7 +39,7 @@ func TestNewAccount(t *testing.T) {
 	}
 }
 
-func TestPostgres_AddAppUser(t *testing.T) {
+func TestPostgres_AddAccount(t *testing.T) {
 	t.Parallel()
 
 	assert := require.New(t)
@@ -66,11 +67,12 @@ func TestPostgres_AddAppUser(t *testing.T) {
 			Username: "SomeName",
 			Password: "",
 		})
-		assert.Error(err, "password is empty")
+		assert.NoError(err, "")
+
 	})
 }
 
-func TestPostgres_GetAdminAppUser(t *testing.T) {
+func TestPostgres_GetAdminAccounts(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
 
@@ -122,7 +124,7 @@ func TestPostgres_GetAccounts(t *testing.T) {
 	})
 }
 
-func TestPostgres_RemoveAppUser(t *testing.T) {
+func TestPostgres_RemoveAccount(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
 
@@ -149,7 +151,7 @@ func TestPostgres_RemoveAppUser(t *testing.T) {
 	})
 }
 
-func TestPostgres_UpdateAppUser(t *testing.T) {
+func TestPostgres_UpdateAccount(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
 
@@ -192,11 +194,10 @@ func newAccounts() ([]*Account, error) {
 	}
 
 	for _, v := range values {
-		u, err := NewAccount(v.Username, v.Password)
+		u, err := NewAccount(v.Username, v.Password, v.IsAdmin)
 		if err != nil {
 			return nil, err
 		}
-		u.IsAdmin = v.IsAdmin
 		accounts = append(accounts, u)
 	}
 	return accounts, nil
