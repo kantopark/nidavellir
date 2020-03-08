@@ -4,17 +4,9 @@ CREATE TABLE IF NOT EXISTS source
     name        VARCHAR(100) CHECK ( length(name) >= 4 ) UNIQUE,
     unique_name VARCHAR(100) UNIQUE,
     repo_url    VARCHAR(2000),
-    state       VARCHAR(20) NOT NULL,
-    next_time   TIMESTAMP   NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS schedule
-(
-    id        SERIAL PRIMARY KEY,
-    source_id INTEGER REFERENCES source (id) ON DELETE CASCADE,
-    day       VARCHAR(20) NOT NULL,
-    time      VARCHAR(5) CHECK ( length(time) = 5),
-    UNIQUE (source_id, day, time)
+    state       VARCHAR(20)  NOT NULL,
+    next_time   TIMESTAMP    NOT NULL,
+    cron_expr   VARCHAR(100) NOT NULL
 );
 
 CREATE TABLE secret

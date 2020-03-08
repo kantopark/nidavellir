@@ -47,8 +47,10 @@ func TestPostgres_GetJob(t *testing.T) {
 
 func TestPostgres_GetJobs(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
+
+	sources, _ := newSources()
+	numJobs := len(sources)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		db, err := newTestDb(info, seedSources, seedJobs)
@@ -56,7 +58,7 @@ func TestPostgres_GetJobs(t *testing.T) {
 
 		jobs, err := db.GetJobs(nil)
 		assert.NoError(err)
-		assert.Len(jobs, 4)
+		assert.Len(jobs, numJobs)
 
 		jobs, err = db.GetJobs(&ListJobOption{
 			Trigger: TriggerSchedule,
@@ -74,14 +76,16 @@ func TestPostgres_GetJobs(t *testing.T) {
 			State: []string{JobQueued},
 		})
 		assert.NoError(err)
-		assert.Len(jobs, 4)
+		assert.Len(jobs, numJobs)
 	})
 }
 
 func TestPostgres_UpdateJob(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
+
+	sources, _ := newSources()
+	numJobs := len(sources)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
 		db, err := newTestDb(info, seedSources, seedJobs)
@@ -89,7 +93,7 @@ func TestPostgres_UpdateJob(t *testing.T) {
 
 		jobs, err := db.GetJobs(nil)
 		assert.NoError(err)
-		assert.Len(jobs, 4)
+		assert.Len(jobs, numJobs)
 
 		job := jobs[0]
 		err = job.ToStartState()

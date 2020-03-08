@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kantopark/cronexpr"
 	"github.com/pkg/errors"
 
 	"nidavellir/libs"
@@ -17,27 +18,27 @@ const (
 )
 
 type Source struct {
-	Id         int        `json:"id"`
-	Name       string     `json:"name"`
-	UniqueName string     `json:"-"`
-	RepoUrl    string     `json:"repoUrl"`
-	State      string     `json:"state"`
-	NextTime   time.Time  `json:"nextTime"`
-	Secrets    []Secret   `json:"secrets"`
-	Schedules  []Schedule `json:"schedules"`
+	Id         int       `json:"id"`
+	Name       string    `json:"name"`
+	UniqueName string    `json:"-"`
+	RepoUrl    string    `json:"repoUrl"`
+	State      string    `json:"state"`
+	NextTime   time.Time `json:"nextTime"`
+	Secrets    []Secret  `json:"secrets"`
+	CronExpr   string    `json:"cron_expr"`
 }
 
-func NewSource(name, repoUrl string, startTime time.Time, secrets []Secret, schedules []Schedule) (s *Source, err error) {
+func NewSource(name, repoUrl string, startTime time.Time, secrets []Secret, cronExpr string) (*Source, error) {
 	name = strings.TrimSpace(name)
 
-	s = &Source{
+	s := &Source{
 		Name:       name,
 		UniqueName: libs.LowerTrimReplaceSpace(name),
 		RepoUrl:    repoUrl,
 		State:      ScheduleNoop,
 		NextTime:   startTime,
 		Secrets:    secrets,
-		Schedules:  schedules,
+		CronExpr:   cronExpr,
 	}
 
 	if err := s.Validate(); err != nil {
@@ -61,6 +62,11 @@ func (s *Source) Validate() error {
 		return errors.Errorf("'%s' is an invalid schedule state", s.State)
 	}
 
+	_, err := cronexpr.Parse(s.CronExpr)
+	if err != nil {
+		return errors.Wrapf(err, "malformed cron expression: %s", s.CronExpr)
+	}
+
 	return nil
 }
 
@@ -72,95 +78,10 @@ func (s *Source) ToRunning() *Source {
 
 // Sets the job's state to completed and calculates the next runtime
 func (s *Source) ToCompleted() *Source {
-	now := time.Now()
-	// set never to run again first
-	s.NextTime = time.Date(9999, 1, 1, 0, 0, 0, 0, time.Local)
-
-	// Set next time to the minimum of the lowest next scheduled time, if schedule is empty, it will
-	// use the max time and never effectively run again
-	for _, sc := range s.Schedules {
-		if t := sc.NextTime(now); t.Before(s.NextTime) {
-			s.NextTime = t
-		}
-	}
-
+	expr := cronexpr.MustParse(s.CronExpr)
+	s.NextTime = expr.Next(s.NextTime)
 	s.State = ScheduleNoop
 	return s
-}
-
-// Simplify the schedule so that if the schedule all weekdays are selected, instead of having
-// 5 schedules for each day with the same time, it'll be a weekday schedule with the same time.
-// Same for everyday. It returns 2 list of schedule, one to add and another to remove
-func (s *Source) SimplifySchedule() (add []*Schedule, remove []*Schedule, err error) {
-	timeDayMap := make(map[string][]string)
-
-	for _, sc := range s.Schedules {
-		timeDayMap[sc.Time] = append(timeDayMap[sc.Time], sc.Day)
-	}
-
-	for t, arr := range timeDayMap {
-		isWeekday := false
-		isEveryday := false
-		var days []string
-
-		// check if there is everyday or weekday, if not add days to a day array
-		for _, day := range arr {
-			if day == Everyday {
-				isEveryday = true
-				break
-			} else if day == Weekday {
-				isWeekday = true
-			} else {
-				days = append(days, day)
-			}
-		}
-
-		// check if days == 5 and all 5 days are weekdays, if so, convert to weekday
-		if libs.StringArrayEqual(days, []string{Monday, Tuesday, Wednesday, Thursday, Friday}) {
-			isWeekday = true
-		}
-		if libs.StringArrayEqual(days, []string{Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday}) {
-			isEveryday = true
-		}
-
-		if isEveryday {
-			hasEveryday := false
-			for _, sc := range s.Schedules {
-				if sc.Day == Everyday {
-					hasEveryday = true
-				} else {
-					remove = append(remove, &sc)
-				}
-			}
-
-			if !hasEveryday {
-				s, err := NewSchedule(s.Id, Everyday, t)
-				if err != nil {
-					return nil, nil, err
-				}
-				add = append(add, s)
-			}
-		} else if isWeekday {
-			hasWeekday := false
-			for _, sc := range s.Schedules {
-				if sc.Day == Weekday {
-					hasWeekday = true
-				} else {
-					remove = append(remove, &sc)
-				}
-			}
-
-			if !hasWeekday {
-				s, err := NewSchedule(s.Id, Weekday, t)
-				if err != nil {
-					return nil, nil, err
-				}
-				add = append(add, s)
-			}
-		}
-	}
-
-	return
 }
 
 // Adds a new job source

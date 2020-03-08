@@ -13,31 +13,25 @@ import (
 )
 
 func TestNewSource(t *testing.T) {
-
 	t.Parallel()
 	assert := require.New(t)
 
 	tests := []struct {
-		Name      string
-		RepoUrl   string
-		Secrets   []Secret
-		Schedules []Schedule
-		Error     string
+		Name     string
+		RepoUrl  string
+		Secrets  []Secret
+		CronExpr string
+		Error    string
 	}{
-		{"Project", "https://git-repo", nil, nil, ""},
-		{"Project", "https://git-repo", []Secret{{
-			Key:   "Key",
-			Value: "Value",
-		}}, []Schedule{{
-			Day:  Everyday,
-			Time: "09:30",
-		}}, ""},
-		{"123  ", "https://git-repo", nil, nil, "name length must be >= 4 characters"},
-		{"Project", "git-repo", nil, nil, "invalid repo url"},
+		{"Project", "https://git-repo", nil, "* * * * * * *", ""},
+		{"Project", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, "* * * * * * *", ""},
+		{"123  ", "https://git-repo", nil, "* * * * * * *", "name length must be >= 4 characters"},
+		{"Project", "git-repo", nil, "* * * * * * *", "invalid repo url"},
+		{"Project", "https://git-repo", nil, "bad cron expression", "invalid cron expression url"},
 	}
 
 	for _, test := range tests {
-		s, err := NewSource(test.Name, test.RepoUrl, time.Now(), test.Secrets, test.Schedules)
+		s, err := NewSource(test.Name, test.RepoUrl, time.Now(), test.Secrets, test.CronExpr)
 		if test.Error != "" {
 			assert.Error(err, test.Error)
 			assert.Nil(s)
@@ -46,6 +40,21 @@ func TestNewSource(t *testing.T) {
 			assert.IsType(Source{}, *s)
 		}
 	}
+}
+
+func TestNewSource_NextTime(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+	now := time.Now()
+
+	// daily cron expression
+	s, err := NewSource("Project", "https://git-repo", now, nil, "0 0 0 * * * *")
+	assert.NoError(err)
+	s.ToCompleted()
+
+	nextTime := now.AddDate(0, 0, 1)
+	nextTime = time.Date(nextTime.Year(), nextTime.Month(), nextTime.Day(), 0, 0, 0, 0, nextTime.Location())
+	assert.Equal(nextTime, s.NextTime)
 }
 
 func TestPostgres_AddSource(t *testing.T) {
@@ -199,8 +208,7 @@ func TestPostgres_UpdateSource(t *testing.T) {
 
 		s, err := db.GetSource(1)
 		assert.NoError(err)
-		nSch := len(s.Schedules)
-		nSec := len(s.Secrets)
+		numSec := len(s.Secrets)
 
 		name := fmt.Sprintf("New-Project-Name-%d", s.Id)
 		s.Name = name
@@ -209,47 +217,37 @@ func TestPostgres_UpdateSource(t *testing.T) {
 			Key:      "NewKey",
 			Value:    "NewValue",
 		})
-		s.Schedules = append(s.Schedules, Schedule{
-			SourceId: s.Id,
-			Day:      Monday,
-			Time:     "12:30",
-		})
-
 		s, err = db.UpdateSource(s)
 		assert.NoError(err)
-		assert.Len(s.Schedules, nSch+1)
-		assert.Len(s.Secrets, nSec+1)
+		assert.Len(s.Secrets, numSec+1)
 		assert.EqualValues(s.Name, name)
 
 		// test changes in the source or secret directly
-		s.Schedules[0].Time = "12:31"
-		s.Schedules = append(s.Schedules, Schedule{
-			Day:  Tuesday,
-			Time: "13:30",
+		s.Secrets[0].Value = "1234"
+		s.Secrets = append(s.Secrets, Secret{
+			Key:   "NewKey2",
+			Value: "13:30",
 		})
 		s, err = db.UpdateSource(s)
 		assert.NoError(err)
-		assert.Equal(s.Schedules[0].Time, "12:31")
-		assert.Len(s.Schedules, nSch+2)
+		assert.Equal(s.Secrets[0].Value, "1234")
+		assert.Len(s.Secrets, numSec+2)
 	})
 }
 
 func newSources() ([]*Source, error) {
 	var sources []*Source
 
-	t := time.Now().Add(-2 * time.Minute).Format("15:04")
 	for _, i := range []struct {
-		Name      string
-		RepoUrl   string
-		Secrets   []Secret
-		Schedules []Schedule
+		Name     string
+		RepoUrl  string
+		Secrets  []Secret
+		CronExpr string
 	}{
-		{"Project 1", "https://git-repo", nil, nil},
-		{"Project 2", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, nil},
-		{"Project 3", "https://git-repo", nil, []Schedule{{Day: Everyday, Time: t}}},
-		{"Project 4", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, []Schedule{{Day: Everyday, Time: t}}},
+		{"Project 1", "https://git-repo", nil, "* * * * * * *"},
+		{"Project 2", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, "* * * * * * *"},
 	} {
-		s, err := NewSource(i.Name, i.RepoUrl, time.Now(), i.Secrets, i.Schedules)
+		s, err := NewSource(i.Name, i.RepoUrl, time.Now(), i.Secrets, i.CronExpr)
 		if err != nil {
 			return nil, err
 		}
