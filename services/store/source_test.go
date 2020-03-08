@@ -23,10 +23,12 @@ func TestNewSource(t *testing.T) {
 		CronExpr string
 		Error    string
 	}{
-		{"Project", "https://git-repo", nil, "* * * * * * *", ""},
-		{"Project", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, "* * * * * * *", ""},
-		{"123  ", "https://git-repo", nil, "* * * * * * *", "name length must be >= 4 characters"},
-		{"Project", "git-repo", nil, "* * * * * * *", "invalid repo url"},
+		{"Project", "https://git-repo", nil, "0 0 0 * * * *", ""},
+		{"Project", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, "0 0 0 * * * *", ""},
+		{"Project", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, "0 * 0 * * * *", "Interval between jobs too short (Every Minute)"},
+		{"Project", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, "0 0/2 0 * * * *", "Interval between jobs too short (Every 2 Minute)"},
+		{"123  ", "https://git-repo", nil, "0 0 0 * * * *", "name length must be >= 4 characters"},
+		{"Project", "git-repo", nil, "0 0 0 * * * *", "invalid repo url"},
 		{"Project", "https://git-repo", nil, "bad cron expression", "invalid cron expression url"},
 	}
 
@@ -45,6 +47,7 @@ func TestNewSource(t *testing.T) {
 func TestNewSource_NextTime(t *testing.T) {
 	t.Parallel()
 	assert := require.New(t)
+
 	now := time.Now()
 
 	// daily cron expression
@@ -59,8 +62,8 @@ func TestNewSource_NextTime(t *testing.T) {
 
 func TestPostgres_AddSource(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
+
 	sources, err := newSources()
 	assert.NoError(err)
 
@@ -78,7 +81,6 @@ func TestPostgres_AddSource(t *testing.T) {
 
 func TestPostgres_GetSource(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
@@ -130,7 +132,6 @@ func TestPostgres_GetSources(t *testing.T) {
 
 func TestPostgres_GetSources_MaskedSecret(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
 
 	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
@@ -157,8 +158,8 @@ func TestPostgres_GetSources_MaskedSecret(t *testing.T) {
 
 func TestPostgres_RemoveSource(t *testing.T) {
 	t.Parallel()
-
 	assert := require.New(t)
+
 	sources, err := newSources()
 	assert.NoError(err)
 
@@ -244,8 +245,8 @@ func newSources() ([]*Source, error) {
 		Secrets  []Secret
 		CronExpr string
 	}{
-		{"Project 1", "https://git-repo", nil, "* * * * * * *"},
-		{"Project 2", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, "* * * * * * *"},
+		{"Project 1", "https://git-repo", nil, "0 0 0 * * * *"},
+		{"Project 2", "https://git-repo", []Secret{{Key: "Key", Value: "Value"}}, "0 0 0 * * * *"},
 	} {
 		s, err := NewSource(i.Name, i.RepoUrl, time.Now(), i.Secrets, i.CronExpr)
 		if err != nil {

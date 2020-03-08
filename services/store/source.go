@@ -62,9 +62,16 @@ func (s *Source) Validate() error {
 		return errors.Errorf("'%s' is an invalid schedule state", s.State)
 	}
 
-	_, err := cronexpr.Parse(s.CronExpr)
+	cron, err := cronexpr.Parse(s.CronExpr)
 	if err != nil {
 		return errors.Wrapf(err, "malformed cron expression: %s", s.CronExpr)
+	}
+
+	nextTimes := cron.NextN(time.Now(), 100)
+	for i, t := range nextTimes[1:] {
+		if t.Sub(nextTimes[i]).Minutes() < 5 {
+			return errors.New("cron interval has instance where 1 job and another differs by less than 5 minutes")
+		}
 	}
 
 	return nil
