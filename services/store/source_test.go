@@ -97,6 +97,24 @@ func TestPostgres_GetSource(t *testing.T) {
 	})
 }
 
+func TestPostgres_GetSourceByName(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+
+	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
+		db, err := newTestDb(info, seedSources)
+		assert.NoError(err)
+
+		source, err := db.GetSourceByName("Project 1")
+		assert.NoError(err)
+		assert.IsType(&Source{}, source)
+
+		source, err = db.GetSourceByName("Project 0")
+		assert.Error(err)
+		assert.Nil(source)
+	})
+}
+
 func TestPostgres_GetSources(t *testing.T) {
 	t.Parallel()
 
@@ -255,4 +273,19 @@ func newSources() ([]*Source, error) {
 		sources = append(sources, s)
 	}
 	return sources, nil
+}
+
+func seedSources(db *Postgres) error {
+	sources, err := newSources()
+	if err != nil {
+		return err
+	}
+
+	for _, s := range sources {
+		_, err := db.AddSource(s)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

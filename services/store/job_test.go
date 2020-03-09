@@ -125,21 +125,6 @@ func TestPostgres_UpdateJob(t *testing.T) {
 	})
 }
 
-func seedSources(db *Postgres) error {
-	sources, err := newSources()
-	if err != nil {
-		return err
-	}
-
-	for _, s := range sources {
-		_, err := db.AddSource(s)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func seedJobs(db *Postgres) error {
 	sources, err := db.GetSources(nil)
 	if err != nil {

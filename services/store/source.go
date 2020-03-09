@@ -115,6 +115,15 @@ func (p *Postgres) GetSource(id int) (*Source, error) {
 	return &source, nil
 }
 
+func (p *Postgres) GetSourceByName(name string) (*Source, error) {
+	var source Source
+	if err := p.db.First(&source, "unique_name = ?", libs.LowerTrimReplaceSpace(name)).Error; err != nil {
+		return nil, errors.Wrapf(err, "could not find source with name '%s'", name)
+	}
+
+	return &source, nil
+}
+
 type GetSourceOption struct {
 	ScheduledToRun bool
 	MaskSecrets    bool
