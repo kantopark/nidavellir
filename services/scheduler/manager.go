@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"nidavellir/config"
 	"nidavellir/libs"
 	"nidavellir/services/iofiles"
 	rp "nidavellir/services/repo"
@@ -27,15 +28,17 @@ type JobManager struct {
 	CompletedJobs []int
 	// Path to folder/volume that stores task output and logs
 	AppFolderPath string
+	token         string
+	provider      string
 }
 
 // The manager holds a queue of job. Whenever there are new jobs, it will dispatch
 // the job. At any one time, it can only run one job. Thus the jobs are queued.
 // You should not be creating a JobManager, but should call NewScheduler which will
 // create a JobManager internally.
-func NewJobManager(db IStore, ctx context.Context, appFolderPath string) (*JobManager, error) {
-	if !libs.PathExists(appFolderPath) {
-		err := os.MkdirAll(appFolderPath, 0777)
+func NewJobManager(db IStore, ctx context.Context, conf config.AppConfig) (*JobManager, error) {
+	if !libs.PathExists(conf.WorkDir) {
+		err := os.MkdirAll(conf.WorkDir, 0777)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not create data folder")
 		}
@@ -48,7 +51,9 @@ func NewJobManager(db IStore, ctx context.Context, appFolderPath string) (*JobMa
 		queue:         NewJobQueue(),
 		started:       false,
 		CompletedJobs: []int{},
-		AppFolderPath: appFolderPath,
+		AppFolderPath: conf.WorkDir,
+		token:         conf.PAT.Token,
+		provider:      conf.PAT.Provider,
 	}, nil
 }
 
@@ -89,7 +94,7 @@ func (m *JobManager) AddJob(source *store.Source, trigger string) error {
 		return err
 	}
 
-	repo, err := rp.NewRepo(source.RepoUrl, source.UniqueName, m.AppFolderPath)
+	repo, err := rp.NewRepo(source.RepoUrl, source.UniqueName, m.AppFolderPath, m.provider, m.token)
 	if err != nil {
 		return err
 	}

@@ -97,7 +97,7 @@ func (m mockStore) UpdateJob(job *store.Job) (*store.Job, error) {
 func TestNewJobManager(t *testing.T) {
 	assert := require.New(t)
 	db := newMockStore()
-	manager, err := NewJobManager(db, context.Background(), appDir)
+	manager, err := NewJobManager(db, context.Background(), appConf)
 	assert.NoError(err)
 
 	manager.Start()
@@ -138,7 +138,7 @@ func TestNewJobManager(t *testing.T) {
 func TestNewJobManager_NoTimeOut(t *testing.T) {
 	assert := require.New(t)
 	db := newMockStore()
-	manager, err := NewJobManager(db, context.Background(), appDir)
+	manager, err := NewJobManager(db, context.Background(), appConf)
 	assert.NoError(err)
 
 	manager.Start()

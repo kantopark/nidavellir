@@ -56,7 +56,8 @@ func initRepos() {
 func pullRepo(source string, errCh chan<- error) *repo.Repo {
 	name := filepath.Base(source)
 
-	rp, err := repo.NewRepo(source, name, appDir)
+	pat := appConf.PAT
+	rp, err := repo.NewRepo(source, name, appDir, pat.Provider, pat.Token)
 	if err != nil {
 		errCh <- err
 		return nil

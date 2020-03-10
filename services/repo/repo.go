@@ -14,15 +14,39 @@ import (
 	"nidavellir/libs"
 )
 
+type Provider string
+
+const (
+	NoRemote     Provider = ""
+	Github       Provider = "github"
+	GitlabCI     Provider = "gitlab-ci-token"
+	GitlabOauth2 Provider = "oauth2"
+)
+
+func ParseProvider(provider string) (Provider, error) {
+	if t, exists := map[string]Provider{
+		"":                NoRemote,
+		"github":          Github,
+		"gitlab-ci-token": GitlabCI,
+		"gitlab-oauth2":   GitlabOauth2,
+	}[libs.LowerTrim(provider)]; !exists {
+		return "", errors.Errorf("invalid provider: %s", provider)
+	} else {
+		return t, nil
+	}
+}
+
 type Repo struct {
 	// Repo source url
 	Source string
 	// Repo name
 	Name string
-	// Set this to true if using gitlab
-	Gitlab bool
-	// Gitlab or Github token
-	Token string
+
+	// The token provider. Use one of github, gitlab-ci-token or gitlab-oauth2
+	provider Provider
+	// the token
+	token string
+
 	// Repo's file path. The root of that file path will be the working directory
 	WorkDir string
 
@@ -42,17 +66,27 @@ type Repo struct {
 // re-clone or pull the actual repo before calling NewRepo). If that is the case,
 // the repo will then checkout any previous versions as specified in the
 // runtime.yaml config file
-func NewRepo(source, name, appFolder string) (*Repo, error) {
+func NewRepo(source, name, appFolder, provider, token string) (*Repo, error) {
 	workDir, err := getWorkDir(appFolder, name)
 	if err != nil {
 		return nil, err
 	}
+
+	if token == "" {
+		provider = string(NoRemote)
+	}
+
+	p, err := ParseProvider(provider)
+	if err != nil {
+		return nil, err
+	}
+
 	r := &Repo{
-		Source:  source,
-		Name:    libs.LowerTrimReplaceSpace(name),
-		Gitlab:  os.Getenv("NIDA_GITLAB") == "1",
-		Token:   os.Getenv("NIDA_TOKEN"),
-		WorkDir: workDir,
+		Source:   source,
+		Name:     libs.LowerTrimReplaceSpace(name),
+		provider: p,
+		token:    token,
+		WorkDir:  workDir,
 	}
 
 	if !r.Exists() {
@@ -147,19 +181,19 @@ func (r *Repo) BuildImage() (string, error) {
 }
 
 func (r *Repo) gitUrl() string {
-	token := strings.TrimSpace(r.Token)
-	if token == "" {
-		return r.Source
-	}
-
 	parts := strings.Split(r.Source, "://")
 	schema := parts[0]
 	path := parts[1]
 
-	if r.Gitlab {
-		return fmt.Sprintf("%s://gitlab-ci-token:%s@%s", schema, token, path)
-	} else {
-		return fmt.Sprintf("%s://%s@%s", schema, token, path)
+	switch r.provider {
+	case Github:
+		return fmt.Sprintf("%s://%s@%s", schema, r.token, path)
+	case GitlabCI:
+		fallthrough
+	case GitlabOauth2:
+		return fmt.Sprintf("%s://%s:%s@%s", schema, r.provider, r.token, path)
+	default:
+		return r.Source // no remote
 	}
 }
 

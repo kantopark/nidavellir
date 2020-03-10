@@ -10,16 +10,23 @@ import (
 	"nidavellir/libs"
 )
 
-type appConfig struct {
+type AppConfig struct {
 	WorkDir string `mapstructure:"workdir"`
 	TLS     struct {
 		KeyFile  string `mapstructure:"keyfile"`
 		CertFile string `mapstructure:"certfile"`
 	} `mapstructure:"tls"`
 	Port int `mapstructure:"port"`
+	PAT  PAT `mapstructure:"pat"`
 }
 
-func (a *appConfig) Validate() error {
+// Personal Access Token information
+type PAT struct {
+	Provider string `mapstructure:"provider"`
+	Token    string `mapstructure:"token"`
+}
+
+func (a *AppConfig) Validate() error {
 	a.WorkDir = strings.TrimSpace(a.WorkDir)
 	if a.WorkDir == "" {
 		switch runtime.GOOS {
@@ -38,11 +45,14 @@ func (a *appConfig) Validate() error {
 		}
 	}
 
+	a.PAT.Provider = libs.LowerTrim(a.PAT.Provider)
+	a.PAT.Token = strings.TrimSpace(a.PAT.Token)
+
 	return nil
 }
 
 // Checks if the application has TLS certificates
-func (a *appConfig) HasCerts() bool {
+func (a *AppConfig) HasCerts() bool {
 	exists := func(filepath string) bool {
 		filepath = strings.TrimSpace(filepath)
 		if _, err := os.Stat(filepath); os.IsNotExist(err) {

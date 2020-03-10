@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
+
+	"nidavellir/config"
 )
 
 type Scheduler struct {
@@ -14,10 +16,10 @@ type Scheduler struct {
 
 // Scheduler pings the database at fixed interval to look for new jobs
 // If there are, it will push the job into the manager
-func NewScheduler(db IStore, appFolderPath string) (*Scheduler, error) {
+func NewScheduler(db IStore, conf config.AppConfig) (*Scheduler, error) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
-	manager, err := NewJobManager(db, ctx, appFolderPath)
+	manager, err := NewJobManager(db, ctx, conf)
 	if err != nil {
 		return nil, err
 	}

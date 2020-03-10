@@ -14,6 +14,7 @@ import (
 	"github.com/dhui/dktest"
 	"github.com/pkg/errors"
 
+	"nidavellir/config"
 	"nidavellir/services/iofiles"
 )
 
@@ -35,6 +36,7 @@ var (
 		ReadyTimeout: 5 * time.Minute,
 		Env:          postgresEnv,
 	}
+	appConf config.AppConfig
 )
 
 func init() {
@@ -68,6 +70,19 @@ func init() {
 		jobIds <- i
 	}
 	initRepos()
+
+	githubToken := os.Getenv("GITHUB_TOKEN")
+	provider := "github"
+	if githubToken == "" {
+		provider = ""
+	}
+	appConf = config.AppConfig{
+		WorkDir: dir,
+		PAT: config.PAT{
+			Provider: provider,
+			Token:    githubToken,
+		},
+	}
 }
 
 func connectionString(c dktest.ContainerInfo) (string, error) {

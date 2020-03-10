@@ -26,7 +26,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	sch, err := scheduler.NewScheduler(db, conf.App.WorkDir)
+	sch, err := scheduler.NewScheduler(db, conf.App)
 	if err != nil {
 		log.Fatalln(err)
 	}

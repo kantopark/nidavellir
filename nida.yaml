@@ -17,6 +17,16 @@ app:
     certfile: ""
   # port that the server app runs on
   port: 7050
+  # personal access token settings. The repos provided will be cloned by a single system account
+  # whose credentials are provided
+  pat:
+    # the remote provider. It can be github, gitlab-ci-token, gitlab-oauth2 or "" (empty string)
+    provider: github
+    # the token used. You could put the token in the config file and then put the config file
+    # next to the go-executable. Alternatively, you can inject the token via the
+    # `nida_app.pat.token` environment variable before running the go-executable
+    token:
+
 
 # additional authorization plugins. Presently, the supported types are JWT and BASIC.
 # Nidavellir's BASIC auth uses accounts that are managed in Nidavellir's own database.
