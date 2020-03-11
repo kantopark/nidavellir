@@ -25,7 +25,7 @@ type Source struct {
 	State      string    `json:"state"`
 	NextTime   time.Time `json:"nextTime"`
 	Secrets    []Secret  `json:"secrets"`
-	CronExpr   string    `json:"cron_expr"`
+	CronExpr   string    `json:"cronExpr"`
 }
 
 func NewSource(name, repoUrl string, startTime time.Time, secrets []Secret, cronExpr string) (*Source, error) {
@@ -50,6 +50,7 @@ func NewSource(name, repoUrl string, startTime time.Time, secrets []Secret, cron
 
 func (s *Source) Validate() error {
 	s.Name = strings.TrimSpace(s.Name)
+	s.UniqueName = libs.LowerTrimReplaceSpace(s.Name)
 	if len(s.Name) < 4 {
 		return errors.New("name length must be >= 4 characters")
 	}
@@ -94,6 +95,7 @@ func (s *Source) ToCompleted() *Source {
 // Adds a new job source
 func (p *Postgres) AddSource(source *Source) (*Source, error) {
 	source.Id = 0 // force primary key to be empty
+	source.State = ScheduleNoop
 	if err := source.Validate(); err != nil {
 		return nil, err
 	}
