@@ -75,6 +75,10 @@ func (s *Source) Validate() error {
 		}
 	}
 
+	if s.NextTime.IsZero() {
+		s.NextTime = cron.Next(time.Now())
+	}
+
 	return nil
 }
 
