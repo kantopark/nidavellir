@@ -81,9 +81,7 @@ func (m *JobManager) Errors() []error {
 
 // Stops all job and the job manager.
 func (m *JobManager) Close() {
-	if m.started {
-		m.started = false
-	}
+	m.started = false
 }
 
 // Adds a job into the manager queue. Jobs are saved as TaskGroups in the
@@ -149,19 +147,18 @@ func (m *JobManager) searchForWork() {
 func (m *JobManager) dispatchJobs() {
 	ch := make(chan bool, 1)
 	ticker := time.NewTicker(5 * time.Second)
+	maxJobs := 1
+	numJobs := 0
 
 	for {
 		select {
 		case <-ticker.C:
-			if len(ch) == 0 && m.queue.HasJob() {
-				ch <- true
+			if numJobs < maxJobs && m.queue.HasJob() {
+				numJobs += 1
 				go m.dispatch(m.queue.Dequeue(), ch)
 			}
 		case <-ch:
-			if m.queue.HasJob() {
-				ch <- true
-				go m.dispatch(m.queue.Dequeue(), ch)
-			}
+			numJobs -= 1
 		case <-m.ctx.Done():
 			return
 		}
@@ -169,10 +166,9 @@ func (m *JobManager) dispatchJobs() {
 }
 
 // Executes the TaskGroup
-func (m *JobManager) dispatch(taskGroup *TaskGroup, done <-chan bool) {
+func (m *JobManager) dispatch(taskGroup *TaskGroup, done chan<- bool) {
 	defer func() {
-		<-done
-
+		done <- true
 		data, err := json.MarshalIndent(struct {
 			Name string `json:"name"`
 			Date string `json:"date"`

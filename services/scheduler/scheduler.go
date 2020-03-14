@@ -2,13 +2,16 @@ package scheduler
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"nidavellir/config"
 )
 
 type Scheduler struct {
+	ctx        context.Context
 	cancelFunc func()
 	db         IStore
 	manager    *JobManager
@@ -25,6 +28,7 @@ func NewScheduler(db IStore, conf config.AppConfig) (*Scheduler, error) {
 	}
 
 	s := &Scheduler{
+		ctx:        ctx,
 		cancelFunc: cancelFunc,
 		db:         db,
 		manager:    manager,
@@ -45,7 +49,17 @@ func (s *Scheduler) Errors() []error {
 
 // fetches eligible jobs and puts them in the job queue
 func (s *Scheduler) Start() {
-	s.manager.Start()
+	ticker := time.NewTicker(1 * time.Minute)
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			// tick every 1 minute to check health of the manager
+			s.manager.Start()
+			log.Print("Scheduler healthy")
+		}
+	}
 }
 
 // Adds a job to the JobManager
