@@ -3,6 +3,7 @@ package server_test
 import (
 	"github.com/pkg/errors"
 
+	"nidavellir/libs"
 	"nidavellir/services/store"
 )
 
@@ -26,6 +27,15 @@ func (m *MockSourceStore) GetSource(id int) (*store.Source, error) {
 	} else {
 		return source, nil
 	}
+}
+
+func (m *MockSourceStore) GetSourceByName(name string) (*store.Source, error) {
+	for _, s := range m.db {
+		if libs.LowerTrimReplaceSpace(s.Name) == libs.LowerTrimReplaceSpace(name) {
+			return s, nil
+		}
+	}
+	return nil, errors.Errorf("could not find source with name '%s'", name)
 }
 
 func (m *MockSourceStore) GetSources(_ *store.GetSourceOption) ([]*store.Source, error) {

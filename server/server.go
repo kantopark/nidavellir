@@ -82,9 +82,7 @@ func attachHandlers(r *chi.Mux, store IStore, scheduler scheduler.IScheduler, co
 
 	r.Get("/healthcheck", HealthCheck)
 
-	// Private APIs
 	r.Route("/api", func(r chi.Router) {
-		// Non-public api protector, auth middleware will drop any unauthorized access
 		r.Route("/source", func(r chi.Router) {
 			r.Use(authentication.New(store, false, conf.Auth...))
 			handler := SourceHandler{DB: store}
@@ -118,13 +116,19 @@ func attachHandlers(r *chi.Mux, store IStore, scheduler scheduler.IScheduler, co
 			r.Post("/", handler.AddAccount())
 			r.Delete("/{id}", handler.RemoveAccount())
 		})
-	})
 
-	// Public APIs
-	r.Route("/public-api", func(r chi.Router) {
-		r.Route("/account", func(r chi.Router) {
-			handler := AccountHandler{DB: store}
-			r.Post("/", handler.ValidateAccount())
+		r.Route("/validate", func(r chi.Router) {
+			r.Route("/account", func(r chi.Router) {
+				handler := AccountHandler{DB: store}
+				r.Post("/", handler.ValidateAccount())
+			})
+
+			r.Route("/source", func(r chi.Router) {
+				handler := SourceHandler{DB: store}
+
+				r.Post("/cron", handler.ValidateCron())
+				r.Get("/exists/{name}", handler.ValidateSourceName())
+			})
 		})
 	})
 
