@@ -2,7 +2,6 @@ package store_test
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -145,32 +144,6 @@ func TestPostgres_GetSources(t *testing.T) {
 		list, err = db.GetSources(&GetSourceOption{ScheduledToRun: true})
 		assert.NoError(err)
 		assert.NotEmpty(list) // in the setup, there is more than 1 task where schedules is specified
-	})
-}
-
-func TestPostgres_GetSources_MaskedSecret(t *testing.T) {
-	t.Parallel()
-	assert := require.New(t)
-
-	dktest.Run(t, imageName, postgresImageOptions, func(t *testing.T, info dktest.ContainerInfo) {
-		db, err := newTestDb(info, seedSources, seedSecrets)
-		assert.NoError(err)
-
-		for _, mask := range []bool{true, false} {
-			sources, err := db.GetSources(&GetSourceOption{MaskSecrets: mask})
-			assert.NoError(err)
-			assert.Len(sources, len(sources))
-
-			for _, source := range sources[1:] {
-				for _, secret := range source.Secrets {
-					if mask {
-						assert.EqualValues(strings.Repeat("*", len(secret.Value)), secret.Value)
-					} else {
-						assert.NotEqual(strings.Repeat("*", len(secret.Value)), secret.Value)
-					}
-				}
-			}
-		}
 	})
 }
 

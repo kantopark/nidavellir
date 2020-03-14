@@ -132,7 +132,6 @@ func (p *Postgres) GetSourceByName(name string) (*Source, error) {
 
 type GetSourceOption struct {
 	ScheduledToRun bool
-	MaskSecrets    bool
 }
 
 // Gets a list of jobs sources specified by the option. If nil, lists all job
@@ -151,13 +150,6 @@ func (p *Postgres) GetSources(options *GetSourceOption) ([]*Source, error) {
 	if err := query.Find(&sources).Error; err != nil {
 		return nil, errors.Wrap(err, "error getting sources")
 	}
-
-	if options.MaskSecrets {
-		for _, source := range sources {
-			source.maskSecrets()
-		}
-	}
-
 	return sources, nil
 }
 
@@ -196,21 +188,6 @@ func (p *Postgres) RemoveSource(id int) error {
 	}
 
 	return nil
-}
-
-// Masks all secret values
-func (s *Source) maskSecrets() {
-	if len(s.Secrets) == 0 {
-		return
-	}
-
-	var secrets []Secret
-	for _, secret := range s.Secrets {
-		secret.Value = strings.Repeat("*", len(secret.Value))
-		secrets = append(secrets, secret)
-	}
-
-	s.Secrets = secrets
 }
 
 func (s *Source) SecretMap() map[string]string {

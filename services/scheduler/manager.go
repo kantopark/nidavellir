@@ -127,7 +127,6 @@ func (m *JobManager) searchForWork() {
 		case <-ticker.C:
 			todos, err := m.db.GetSources(&store.GetSourceOption{
 				ScheduledToRun: true,
-				MaskSecrets:    false,
 			})
 			if err != nil {
 				m.errs <- errors.Wrap(err, "could not fetch sources in scheduler")
