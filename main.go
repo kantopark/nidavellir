@@ -18,6 +18,7 @@ func main() {
 	}
 
 	sys := NewSystem(conf)
+	sys.SystemCheck()
 	dbOption := sys.Initialize()
 	defer sys.CleanUp()
 
