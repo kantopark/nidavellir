@@ -59,11 +59,64 @@ func (s *SourceHandler) GetSource() http.HandlerFunc {
 }
 
 func (s *SourceHandler) CreateSource() http.HandlerFunc {
-	return s.generateCreateUpdateSourceHandlerFunc(true)
+	return func(w http.ResponseWriter, r *http.Request) {
+		var source *store.Source
+		err := readJson(r, &source)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		source, err = s.DB.AddSource(source)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		toJson(w, source)
+	}
 }
 
 func (s *SourceHandler) UpdateSource() http.HandlerFunc {
-	return s.generateCreateUpdateSourceHandlerFunc(false)
+	return func(w http.ResponseWriter, r *http.Request) {
+		var source *store.Source
+		err := readJson(r, &source)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+
+		// to prevent concurrent updates when there is a job that is still updating
+		// as that may screw up secret injection
+		ticker := time.NewTicker(1 * time.Second)
+		for {
+			select {
+			case <-ticker.C:
+				curr, err := s.DB.GetSource(source.Id)
+				if err != nil {
+					http.Error(w, err.Error(), 400)
+					return
+				}
+				if curr.State != store.ScheduleNoop {
+					continue
+				}
+
+				source, err = s.DB.UpdateSource(source)
+				if err != nil {
+					http.Error(w, err.Error(), 400)
+					return
+				}
+
+				toJson(w, source)
+				return
+
+			case <-time.After(1 * time.Minute):
+				http.Error(w, "Source has a job that is still executing. "+
+					"Please update it later when the job is done", 400)
+				return
+			}
+		}
+	}
 }
 
 func (s *SourceHandler) generateCreateUpdateSourceHandlerFunc(isCreate bool) http.HandlerFunc {
