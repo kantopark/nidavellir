@@ -9,6 +9,7 @@ import (
 	"github.com/dhui/dktest"
 	"github.com/stretchr/testify/require"
 
+	"nidavellir/services/repo"
 	. "nidavellir/services/scheduler"
 )
 
@@ -100,8 +101,7 @@ func TestTaskGroup_AddEnvVar(t *testing.T) {
 func TestTaskGroup_Execute(t *testing.T) {
 	assert := require.New(t)
 
-	jobId := uniqueJobId()
-	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now(), appDir)
+	tg, err := newTaskGroup(pythonRepo)
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -118,10 +118,10 @@ func TestTaskGroup_Execute(t *testing.T) {
 
 		tg.AddEnvVar(envs).SetMaxDuration(5 * time.Minute)
 
-		logs, err := tg.Execute()
+		r, err := tg.Execute()
 		assert.NoError(err)
-		assert.NotEmpty(logs)
-		assert.True(tg.Completed)
+		assert.NotEmpty(r.Logs)
+		assert.True(r.Completed)
 	})
 }
 
@@ -137,17 +137,16 @@ func TestTaskGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		jobId := uniqueJobId()
-		tg, err := NewTaskGroup(longOpsRepo, context.Background(), 0, jobId, time.Now(), appDir)
+		tg, err := newTaskGroup(longOpsRepo)
 		assert.NoError(err)
 
 		tg.SetMaxDuration(test.Duration)
-		logs, err := tg.Execute()
+		r, err := tg.Execute()
 		if test.HasError {
 			assert.Error(err)
 		} else {
 			assert.NoError(err)
-			assert.NotEmpty(logs)
+			assert.IsType(&ExecutionResult{}, r)
 		}
 	}
 }
@@ -155,11 +154,36 @@ func TestTaskGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
 func TestTaskGroup_ExitsWithNonZeroFailureCodes(t *testing.T) {
 	assert := require.New(t)
 
-	jobId := uniqueJobId()
-	tg, err := NewTaskGroup(failureRepo, context.Background(), 0, jobId, time.Now(), appDir)
+	tg, err := newTaskGroup(failureRepo)
 	assert.NoError(err)
 
-	logs, err := tg.Execute()
+	r, err := tg.Execute()
 	assert.Error(err)
-	assert.NotEmpty(logs)
+	assert.IsType(&ExecutionResult{}, r)
+}
+
+func TestTaskGroup_BranchExitCode(t *testing.T) {
+	t.Parallel()
+	assert := require.New(t)
+
+	for _, test := range []struct {
+		Env      map[string]string
+		NumSteps int
+	}{
+		{nil, 2},
+		{map[string]string{"exit_code_1_2": "0"}, 3},
+	} {
+		tg, err := newTaskGroup(exitCodeRepo)
+		assert.NoError(err)
+		tg.AddEnvVar(test.Env)
+
+		r, err := tg.Execute()
+		assert.NoError(err)
+		assert.IsType(&ExecutionResult{}, r)
+		assert.Len(r.Steps, test.NumSteps)
+	}
+}
+
+func newTaskGroup(rp *repo.Repo) (*TaskGroup, error) {
+	return NewTaskGroup(rp, context.Background(), 0, uniqueJobId(), time.Now(), appDir)
 }

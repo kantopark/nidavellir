@@ -25,9 +25,9 @@ func TestStepGroup_ExecuteTasks(t *testing.T) {
 	for i := 1; i <= 2; i++ {
 		ctx := context.Background()
 		sem := semaphore.NewWeighted(int64(i))
-		logs, err := sg.ExecuteTasks(ctx, sem)
+		results, err := sg.ExecuteTasks(ctx, sem)
 		assert.NoError(err)
-		assert.NotEmpty(logs)
+		assert.NotEmpty(results.Log)
 
 		dir, err := outputDir(1, jobId)
 		assert.NoError(err)
@@ -63,5 +63,5 @@ func FormTestStepGroup(repo *rp.Repo, jobId int) (*StepGroup, error) {
 		tasks = append(tasks, task)
 	}
 
-	return NewStepGroup(repo.Steps[0].Name, tasks)
+	return NewStepGroup(repo.Steps[0].Name, tasks, nil)
 }

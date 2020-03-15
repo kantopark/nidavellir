@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	pythonRepo  *repo.Repo
-	longOpsRepo *repo.Repo
-	failureRepo *repo.Repo
+	pythonRepo   *repo.Repo
+	longOpsRepo  *repo.Repo
+	failureRepo  *repo.Repo
+	exitCodeRepo *repo.Repo
 )
 
 // clones all repos concurrently
@@ -27,6 +28,7 @@ func initRepos() {
 		{&pythonRepo, "https://github.com/kantopark/python-test-repo"},
 		{&longOpsRepo, "https://github.com/kantopark/python-test-long-ops-repo"},
 		{&failureRepo, "https://github.com/kantopark/python-test-failure-repo"},
+		{&exitCodeRepo, "https://github.com/kantopark/python-test-exit-code"},
 	}
 
 	wg.Add(len(sourceDetails))

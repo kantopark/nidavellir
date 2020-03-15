@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -14,16 +13,16 @@ import (
 )
 
 type StepGroup struct {
-	Name  string
-	Tasks []*Task
-	sep   string
+	Name   string
+	Tasks  []*Task
+	Branch map[int]string
 }
 
-func NewStepGroup(name string, tasks []*Task) (*StepGroup, error) {
+func NewStepGroup(name string, tasks []*Task, branch map[int]string) (*StepGroup, error) {
 	sg := &StepGroup{
-		Name:  strings.TrimSpace(name),
-		Tasks: tasks,
-		sep:   fmt.Sprintf("\n\n%s\n\n", strings.Repeat("-", 100)),
+		Name:   strings.TrimSpace(name),
+		Tasks:  tasks,
+		Branch: branch,
 	}
 
 	if err := sg.Validate(); err != nil {
@@ -33,11 +32,8 @@ func NewStepGroup(name string, tasks []*Task) (*StepGroup, error) {
 }
 
 // Executes all tasks within step group in parallel subject to the semaphore weights
-func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (string, error) {
-	var errs error
-	errCh := make(chan error, len(s.Tasks))
-	done := make(chan bool, 1)
-	ls := NewLogSlice()
+func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (*TaskOutput, error) {
+	ch := make(chan *TaskOutput, len(s.Tasks))
 
 	// set wait group to wait for number of tasks in the current step
 	var wg sync.WaitGroup
@@ -46,11 +42,14 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 	// release the semaphore and reduce wait group count
 	for _, task := range s.Tasks {
 		if err := sem.Acquire(ctx, 1); err != nil {
-			errCh <- errors.Wrap(err, "could not acquire semaphore lock to execute tasks")
+			ch <- &TaskOutput{
+				Log:      errors.Wrap(err, "could not acquire semaphore lock to execute tasks").Error(),
+				ExitCode: 999,
+			}
 			continue
 		}
 		wg.Add(1)
-		go runTask(sem, &wg, ctx, task, errCh, ls)
+		go runTask(sem, &wg, task, ch)
 	}
 
 	// Put the wait group in a go routine. This ensures the done channel is only closed when
@@ -58,44 +57,30 @@ func (s *StepGroup) ExecuteTasks(ctx context.Context, sem *semaphore.Weighted) (
 	// for the done channel to be closed and also listening to errors from the error channel
 	go func() {
 		wg.Wait()
-		close(done)
+		close(ch)
 	}()
 
+	outputs := &TaskOutputs{}
 	for {
 		select {
-		case err := <-errCh:
-			errs = multierror.Append(errs, err)
-		case <-done:
-			// case when the done channel is closed cause all tasks executed successfully,
-			// return errors if any
-			return fmt.Sprintf("Step Group: %s\n%s\n\n", s.Name, ls.Join(s.sep)), errs
+		case result, ok := <-ch:
+			if ok {
+				outputs.Add(result)
+			} else {
+				// channel closed. Time to join all the output together
+				return outputs.Combine(), nil
+			}
+
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
 	}
 }
 
-func runTask(sem *semaphore.Weighted, wg *sync.WaitGroup, ctx context.Context, task *Task, errCh chan<- error, ls *LogSlice) {
+func runTask(sem *semaphore.Weighted, wg *sync.WaitGroup, task *Task, ch chan<- *TaskOutput) {
 	defer sem.Release(1)
 	defer wg.Done()
-	done := make(chan bool, 1)
-
-	go func() {
-		if logs, err := task.Execute(); err != nil {
-			errCh <- errors.Wrapf(err, "error executing task: %s", task.TaskName)
-		} else {
-			ls.Append(fmt.Sprintf(`
-Task: %s
-
-%s
-`, task.TaskName, logs))
-		}
-		close(done)
-	}()
-
-	select {
-	case <-ctx.Done():
-		errCh <- ctx.Err()
-	case <-done:
-	}
+	ch <- task.Execute()
 }
 
 func (s *StepGroup) Validate() error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -24,10 +25,15 @@ type TaskGroup struct {
 	SourceId   int
 	JobId      int
 	TaskDate   string
-	Completed  bool
 	Duration   time.Duration
 	AppFolder  string
 	OutputDir  string
+}
+
+type ExecutionResult struct {
+	Logs      string
+	Completed bool
+	Steps     []int
 }
 
 func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskDate time.Time, appFolder string) (*TaskGroup, error) {
@@ -45,7 +51,6 @@ func NewTaskGroup(rp *repo.Repo, ctx context.Context, sourceId, jobId int, taskD
 		SourceId:   sourceId,
 		JobId:      jobId,
 		TaskDate:   taskDate.Format("2006-01-02 15:04:05"),
-		Completed:  false,
 		Duration:   1 * time.Hour, // default duration is 1 hour
 		AppFolder:  appFolder,
 		OutputDir:  outputDir,
@@ -92,27 +97,64 @@ func (t *TaskGroup) SetMaxDuration(duration time.Duration) *TaskGroup {
 	return t
 }
 
-func (t *TaskGroup) Execute() (string, error) {
-	var logArray []string
+// Executes the TaskGroup and returns the ExecutionResult. Note that even if the TaskGroup
+// returns an error, the ExecutionResult will not be empty. This is because the
+// ExecutionResult will store successful intermediate results
+func (t *TaskGroup) Execute() (*ExecutionResult, error) {
+	output := &ExecutionResult{}
 
-	formatLogs := func() string {
-		sep := fmt.Sprintf("\n%s\n", strings.Repeat("=", 100))
-		return fmt.Sprintf("Task Group: %s\n\n%s", t.Name, strings.Join(logArray, sep))
+	if len(t.StepGroups) == 0 {
+		return output, nil
 	}
 
+	var logs []string
 	ctx, cancel := context.WithTimeout(t.ctx, t.Duration)
 	defer cancel()
 
-	for _, sg := range t.StepGroups {
-		logs, err := sg.ExecuteTasks(ctx, t.sem)
+	index := 0
+	sg := t.StepGroups[index]
+	for {
+		output.Steps = append(output.Steps, index)
+		result, err := sg.ExecuteTasks(ctx, t.sem)
 		if err != nil {
-			return formatLogs(), err
+			return output, err
 		}
-		logArray = append(logArray, logs)
-	}
-	t.Completed = true
+		logs = append(logs, result.Log)
 
-	return formatLogs(), nil
+		sg, index, err = t.nextStep(index, result.ExitCode)
+		if err != nil || sg == nil {
+			output.Completed = sg == nil
+			output.Logs = formatLogs(t.Name, logs)
+
+			return output, err
+		}
+	}
+}
+
+// determines the next step based on the branching rules conditioned on the current step index and exit code
+func (t *TaskGroup) nextStep(index, exitCode int) (*StepGroup, int, error) {
+	if exitCode == 0 {
+		if index+1 == len(t.StepGroups) {
+			return nil, index, nil
+		} else {
+			return t.StepGroups[index+1], index + 1, nil
+		}
+	}
+
+	sg := t.StepGroups[index]
+	name, exist := sg.Branch[exitCode]
+	if !exist {
+		return nil, index, errors.Errorf("StepGroup '%s' returned exit code %d which could not be handled", sg.Name, exitCode)
+	}
+
+	for i, next := range t.StepGroups[index+1:] {
+		// ideal, the next step exists in one of the next step
+		if next.Name == name {
+			return next, index + i + 1, nil
+		}
+	}
+
+	return nil, index, errors.Errorf("no valid steps detected after StepGroup '%s' received exit code %d for next StepGroup '%s'", sg.Name, exitCode, name)
 }
 
 // Adds StepGroups from the repo.Steps information. Order of execution for the StepGroup
@@ -139,7 +181,7 @@ func (t *TaskGroup) addStepGroups() error {
 			groups = append(groups, t)
 		}
 
-		sg, err := NewStepGroup(step.Name, groups)
+		sg, err := NewStepGroup(step.Name, groups, step.Branch)
 		if err != nil {
 			return err
 		}
@@ -207,4 +249,13 @@ func (t *TaskGroup) logImageOutput(logs string) {
 	defer logFile.Close()
 
 	_ = logFile.Write(logs)
+}
+
+func formatLogs(name string, logs []string) string {
+	sep := fmt.Sprintf("\n%s\n", strings.Repeat("=", 100))
+	body := strings.Join(logs, sep)
+
+	re := regexp.MustCompile(`(?m)^:\s*`)
+	content := fmt.Sprintf("Task Group: %s\n%s", name, body)
+	return re.ReplaceAllString(content, "")
 }

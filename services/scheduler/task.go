@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -51,10 +52,19 @@ func NewTask(taskName, image, tag, cmd, outputDir, workDir string, env map[strin
 	}, nil
 }
 
-func (t *Task) Execute() (string, error) {
+type TaskOutput struct {
+	Log      string
+	ExitCode int
+}
+
+type TaskOutputs struct {
+	outputs []*TaskOutput
+}
+
+func (t *Task) Execute() *TaskOutput {
 	re := regexp.MustCompile(`\s`)
 
-	return container.Run(&container.RunOptions{
+	result, err := container.Run(&container.RunOptions{
 		Image:   t.Image,
 		Name:    t.TaskTag,
 		Restart: "no",
@@ -67,4 +77,52 @@ func (t *Task) Execute() (string, error) {
 		Daemon:  false,
 		WorkDir: t.WorkDir,
 	})
+
+	if result == nil {
+		panic("result should never be empty")
+	}
+
+	logs := []string{"Task: " + t.TaskName, "\n", result.Logs}
+	if err != nil {
+		logs = append(logs, err.Error())
+	}
+
+	return &TaskOutput{
+		Log:      strings.TrimSpace(strings.Join(logs, "\n")),
+		ExitCode: result.ExitCode,
+	}
+}
+
+// Add a task result to the list of outputs
+func (t *TaskOutputs) Add(result *TaskOutput) {
+	t.outputs = append(t.outputs, result)
+}
+
+// Returns the maximum of all the exit codes in the task outputs
+func (t *TaskOutputs) ExitCode() int {
+	exitCode := 0
+	for _, r := range t.outputs {
+		if r.ExitCode > exitCode {
+			exitCode = r.ExitCode
+		}
+	}
+	return exitCode
+}
+
+func (t *TaskOutputs) Logs() string {
+	var logs []string
+	sep := fmt.Sprintf("\n\n%s\n\n", strings.Repeat("-", 100))
+
+	for _, r := range t.outputs {
+		logs = append(logs, r.Log)
+	}
+
+	return strings.Join(logs, sep)
+}
+
+func (t *TaskOutputs) Combine() *TaskOutput {
+	return &TaskOutput{
+		Log:      t.Logs(),
+		ExitCode: t.ExitCode(),
+	}
 }

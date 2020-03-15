@@ -66,9 +66,10 @@ func TestTask_Execute(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	logs, err := task.Execute()
-	assert.NoError(err)
-	assert.NotEmpty(logs)
+	result := task.Execute()
+	assert.IsType(&TaskOutput{}, result)
+	assert.NotEmpty(result.Log)
+	assert.EqualValues(0, result.ExitCode)
 
 	assert.True(libs.PathExists(filepath.Join(outputDir, fileName)))
 }

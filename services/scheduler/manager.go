@@ -206,7 +206,7 @@ func (m *JobManager) dispatch(taskGroup *TaskGroup, done chan<- bool) {
 	}
 
 	// Execute tasks and save logs if any
-	logs, err := taskGroup.Execute()
+	r, err := taskGroup.Execute()
 	if err != nil {
 		err = multierror.Append(err, m.failWork(source, job))
 		err = multierror.Append(err, logFile.Write(err))
@@ -218,7 +218,7 @@ func (m *JobManager) dispatch(taskGroup *TaskGroup, done chan<- bool) {
 		err = multierror.Append(err, logFile.Write(err))
 		log.Println(err)
 	}
-	_ = logFile.Write(logs)
+	_ = logFile.Write(r.Logs)
 	m.CompletedJobs = append(m.CompletedJobs, job.Id)
 }
 
