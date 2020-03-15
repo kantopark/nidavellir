@@ -17,10 +17,10 @@ import (
 // Repo environment variable can be seen from the runtime config in
 // https://github.com/kantopark/python-test-repo/blob/master/runtime.yaml
 func TestTaskGroup_TaskEnvVarProcessedCorrectly(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
-	jobId := uniqueJobId()
 
-	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now(), appDir)
+	tg, err := newTaskGroup(pythonRepo)
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -53,10 +53,10 @@ func TestTaskGroup_TaskEnvVarProcessedCorrectly(t *testing.T) {
 }
 
 func TestTaskGroup_AddEnvVar(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
-	jobId := uniqueJobId()
 
-	tg, err := NewTaskGroup(pythonRepo, context.Background(), 0, jobId, time.Now(), appDir)
+	tg, err := newTaskGroup(pythonRepo)
 	assert.NoError(err)
 	assert.Len(tg.StepGroups, 3)
 
@@ -99,6 +99,7 @@ func TestTaskGroup_AddEnvVar(t *testing.T) {
 }
 
 func TestTaskGroup_Execute(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 
 	tg, err := newTaskGroup(pythonRepo)
@@ -126,6 +127,7 @@ func TestTaskGroup_Execute(t *testing.T) {
 }
 
 func TestTaskGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 
 	tests := []struct {
@@ -152,6 +154,7 @@ func TestTaskGroup_LongRunningTasksCancelledCorrectly(t *testing.T) {
 }
 
 func TestTaskGroup_ExitsWithNonZeroFailureCodes(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 
 	tg, err := newTaskGroup(failureRepo)

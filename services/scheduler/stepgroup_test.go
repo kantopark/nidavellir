@@ -15,6 +15,7 @@ import (
 
 // Using the PythonRepo, tests that tasks are executed correctly
 func TestStepGroup_ExecuteTasks(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 
 	jobId := uniqueJobId()

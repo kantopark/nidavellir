@@ -45,9 +45,10 @@ func TestNewTask(t *testing.T) {
 }
 
 func TestTask_Execute(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
-	repo := pythonRepo
 
+	repo := pythonRepo
 	jobId := uniqueJobId()
 	outputDir, err := outputDir(1, jobId)
 	assert.NoError(err)
