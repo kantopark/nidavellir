@@ -25,9 +25,15 @@ type rSetup struct {
 }
 
 type rStep struct {
-	Name  string            `yaml:"name"`
-	Tasks []rTask           `yaml:"tasks"`
-	Env   map[string]string `yaml:"environment"`
+	Name   string            `yaml:"name"`
+	Tasks  []rTask           `yaml:"tasks"`
+	Env    map[string]string `yaml:"environment"`
+	Branch []rBranch         `yaml:"branch"`
+}
+
+type rBranch struct {
+	Code int    `yaml:"code"`
+	Step string `yaml:"step"`
 }
 
 type rTask struct {

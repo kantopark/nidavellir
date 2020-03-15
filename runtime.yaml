@@ -10,7 +10,7 @@ setup:
   # The image that is used to run the task. If it does not exist in the local
   # image repository, will attempt to pull it. If provided, the user should
   # ideally provide the tags as well to "version control" it
-  image: danielbok/python-nida:3.7.6
+  image: danielbok/nida-python:3.7.6
 
 # global environment variables
 environment:
@@ -20,6 +20,8 @@ environment:
 
 steps:
   # elements in steps are executed in order with the name representing the step name
+  # try not to name different steps with the same name as it'll lead to unintended
+  # behaviour during branching
   - name: Extraction
     environment:
       stepEnv1: any string value which will be same across all tasks
@@ -33,6 +35,26 @@ steps:
       - name: Extract from DB B
         cmd: extract_b.py
 
+    # branch determines the next step based on the exit code. It is OPTIONAL
+    # By default, an exit code of 0 will move to the next step and any other
+    # undefined exit codes will EXIT the program. When multiple tasks are in
+    # defined in the step, the step which returns the largest exit code will
+    # be the final exit code used to determine the branching rule
+    branch:
+      # this is actually the default behaviour
+      - code: 0  # exit code, this must be non-negative (i.e. >= 0)
+        step: Transformation 1
+
+      # this behaviour is redundant as EXIT will be called whenever an unknown exit
+      # code is given. However, you can still choose to be explicit. In any case, do
+      # not name any of your step groups as EXIT, as rather than going to that step
+      # group, the program will actually exit entirely
+      - code: 999
+        step: EXIT
+
+      # Go to the name specified by "step" if that exit code is met
+      - code: 1
+        step: Store
   - name: Transformation 1
     tasks:
       - name: Transform just A

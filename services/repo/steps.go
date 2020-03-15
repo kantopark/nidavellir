@@ -13,6 +13,7 @@ type Step struct {
 	Name         string
 	TaskInfoList []*TaskInfo
 	Env          map[string]string
+	Branch       map[int]string
 }
 
 type TaskInfo struct {
@@ -69,6 +70,13 @@ func (s *rStep) newStepGroup(repoName, image, repoDir string, globalEnv map[stri
 	for _, t := range s.Tasks {
 		task := t.newTask(repoName, s.Name, image, repoDir, sg.Env)
 		sg.TaskInfoList = append(sg.TaskInfoList, task)
+	}
+
+	if len(s.Branch) > 0 {
+		sg.Branch = make(map[int]string, len(s.Branch))
+		for _, b := range s.Branch {
+			sg.Branch[b.Code] = b.Step
+		}
 	}
 
 	return sg, nil
