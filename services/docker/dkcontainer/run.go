@@ -30,6 +30,11 @@ type RunOptions struct {
 	WorkDir string
 }
 
+type RunResult struct {
+	ExitCode int
+	Logs     string
+}
+
 func (o *RunOptions) imageTag() (string, error) {
 	o.Image = strings.TrimSpace(o.Image)
 	o.Tag = strings.TrimSpace(o.Tag)
@@ -48,7 +53,7 @@ func (o *RunOptions) imageTag() (string, error) {
 	return fmt.Sprintf("%s:%s", o.Image, o.Tag), nil
 }
 
-func Run(options *RunOptions) (logs string, err error) {
+func Run(options *RunOptions) (*RunResult, error) {
 	args := []string{"container", "run"}
 
 	if options.Daemon {
@@ -84,10 +89,15 @@ func Run(options *RunOptions) (logs string, err error) {
 		}
 	}
 
-	if image, err := options.imageTag(); err != nil {
-		return "", err
+	if imageLog, err := options.imageTag(); err != nil {
+		code, err := errorWithExitCode(err)
+
+		return &RunResult{
+			ExitCode: code,
+			Logs:     imageLog,
+		}, err
 	} else {
-		args = append(args, image)
+		args = append(args, imageLog)
 	}
 
 	args = append(args, options.Cmd...)
@@ -99,8 +109,28 @@ func Run(options *RunOptions) (logs string, err error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", errors.Wrap(err, string(output))
+		code, err := errorWithExitCode(err)
+
+		return &RunResult{
+			ExitCode: code,
+			Logs:     string(output),
+		}, err
 	}
 
-	return string(output), nil
+	return &RunResult{
+		ExitCode: 0,
+		Logs:     string(output),
+	}, nil
+}
+
+func errorWithExitCode(err error) (int, error) {
+	if err == nil {
+		return 0, nil
+	}
+
+	if err, ok := err.(*exec.ExitError); ok {
+		return err.ExitCode(), err
+	} else {
+		return 999, err // default exit code
+	}
 }

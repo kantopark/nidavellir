@@ -87,7 +87,7 @@ func (s *System) Initialize() (option *store.DbOption) {
 }
 
 func (s *System) startDb(option *store.DbOption) error {
-	if logs, err := container.Run(&container.RunOptions{
+	if result, err := container.Run(&container.RunOptions{
 		Image: "postgres",
 		Tag:   "12-alpine",
 		Name:  s.DatabaseName,
@@ -104,7 +104,7 @@ func (s *System) startDb(option *store.DbOption) error {
 	}); err != nil {
 		return err
 	} else {
-		log.Println(fmt.Sprintf("Started postgres database container: %s", strings.TrimSpace(logs)))
+		log.Println(fmt.Sprintf("Started postgres database container: %s", strings.TrimSpace(result.Logs)))
 	}
 	return nil
 }
